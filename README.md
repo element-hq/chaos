@@ -19,26 +19,16 @@ Note: The homeservers do NOT need to be Complement-compatible. Demo scripts do h
 ### Architecture / Dev Notes
 
 ```
-+===========+
-| Host      |     CSAPI
-|  Go Tests ----------------------.
-+========^==+                     |
-         |                        |
-         |callback                |
-         | addon                  |
-+========|========================|=====+
-| Docker |                        |     |
-| +------|----+                   |     |
-| | mitmproxy |                   |     |
-| +------^----+                   |     |
-|        |           +------+     |     |
-|        +---------->| hs1  <--+--+     |
-|        |           +------+  |        |
-|        |           +------+  |        |
-|        `---------->| hs2  <--`        |
-|                    +------+           |
-|                                       |
-+=======================================+
+       +--------------------------------+
+       |             Chaos              |
+       +-|-------------^--------------|-+
+Host     |             |              |
+=========|=============|==============|======
+Docker   | CSAPI       |callback      | CSAPI
+         V             V addon        V
+       +-----+   +-----------+   +-----+
+       | hs1 <---> mitmproxy <---> hs2 |
+       +-----+   +-----------+   +-----+
 ```
 
 This uses the same technique that [complement-crypto](https://github.com/matrix-org/complement-crypto/)
