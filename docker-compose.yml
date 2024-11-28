@@ -43,7 +43,7 @@ services:
     volumes:
       - "./mitmproxy_addons:/addons"
     extra_hosts:
-      - host.docker.internal=172.17.0.1
+      - host.docker.internal=host-gateway
     networks:
       - chaos
     ports:
