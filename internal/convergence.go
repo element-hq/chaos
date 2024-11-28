@@ -106,9 +106,15 @@ func (c *Convergence) Assert(ctx context.Context, bufferDuration time.Duration) 
 	for _, master := range c.masters {
 		switch c.convMechanism {
 		case ConvergenceMechanismMembers:
-			return c.assertWithMembers(master, roomStates)
+			err := c.assertWithMembers(master, roomStates)
+			if err != nil {
+				return err
+			}
 		case ConvergenceMechanismSync:
-			return c.assertWithSync(master, roomStates)
+			err := c.assertWithSync(master, roomStates)
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown convergence mechanism: %v", c.convMechanism)
 		}
