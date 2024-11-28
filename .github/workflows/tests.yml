@@ -21,6 +21,9 @@ jobs:
 
             - name: Run Demo
               run: |
+                whoami
+                ls -alh
+                cat /etc/passwd
                 mkdir -p ./demo/data
                 useradd -u 991 synapse
                 chown synapse ./demo/data
