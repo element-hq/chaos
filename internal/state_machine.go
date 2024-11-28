@@ -100,6 +100,10 @@ func (s *StateMachine) Apply(cmds []WorkerCommand) {
 	}
 }
 
+func (s *StateMachine) GetInternalState() map[string]map[string]State {
+	return s.copyInternalState()
+}
+
 func (s *StateMachine) copyInternalState() map[string]map[string]State {
 	workingCopy := make(map[string]map[string]State)
 	for u := range s.userToRoomStates {

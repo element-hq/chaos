@@ -132,7 +132,11 @@ func (m *Master) StartWorkers(numWorkers, opsPerTick int) {
 func (m *Master) Start(seed int64, opsPerTick int, postTickFn func(tickIteration int)) {
 	userIDs := slices.Collect(maps.Keys(m.userIDToWorker))
 	stateMachine := NewStateMachine(seed, opsPerTick, userIDs, m.roomIDs)
-	m.convergence = NewConvergence(m.masters, m.roomIDs, stateMachine, func(wc ws.PayloadConvergence) {
+	convMasters := make([]CSAPIConvergence, len(m.masters))
+	for i := range convMasters {
+		convMasters[i] = &m.masters[i]
+	}
+	m.convergence = NewConvergence(convMasters, m.roomIDs, stateMachine, func(wc ws.PayloadConvergence) {
 		m.wsServer.Send(&wc)
 	})
 	for {

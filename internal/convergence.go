@@ -13,6 +13,16 @@ import (
 
 type ConvergenceMechanism = int
 
+type Membership string
+
+const (
+	MembershipJoin   Membership = "join"
+	MembershipLeave  Membership = "leave"
+	MembershipInvite Membership = "invite"
+	MembershipBan    Membership = "ban"
+	MembershipKnock  Membership = "knock"
+)
+
 const (
 	// Verifies convergence by using /sync as a sync mechanism.
 	// This is very unreliable, and frequently gives wrong values, even for local users.
@@ -22,15 +32,29 @@ const (
 	ConvergenceMechanismMembers
 )
 
+// CSAPI functions needed to do convergence checks
+type CSAPIConvergence interface {
+	Members(roomID string) ([]Event, error)
+	Sync(syncReq SyncReq) (*SyncResponse, error)
+	SendMessageWithText(roomID string, text string) (string, error)
+	Event(roomID, eventID string) (*Event, error)
+	GetUserID() string
+}
+
+// StateMachine functions needed to do convergence checks
+type StateMachineConvergence interface {
+	GetInternalState() map[string]map[string]State //user->room->state
+}
+
 type Convergence struct {
-	masters       []CSAPI
+	masters       []CSAPIConvergence
 	roomIDs       []string
-	sm            *StateMachine
+	sm            StateMachineConvergence
 	convMechanism ConvergenceMechanism
 	updaterFn     func(ws.PayloadConvergence)
 }
 
-func NewConvergence(masters []CSAPI, roomIDs []string, sm *StateMachine, updaterFn func(ws.PayloadConvergence)) *Convergence {
+func NewConvergence(masters []CSAPIConvergence, roomIDs []string, sm StateMachineConvergence, updaterFn func(ws.PayloadConvergence)) *Convergence {
 	return &Convergence{
 		masters:       masters,
 		roomIDs:       roomIDs,
@@ -56,7 +80,7 @@ func (c *Convergence) Assert(ctx context.Context, bufferDuration time.Duration) 
 	time.Sleep(bufferDuration)
 	// room ID => user ID => State, confusingly the inverse of StateMachine's user ID => room ID => State
 	roomStates := make(map[string]map[string]State)
-	state := c.sm.copyInternalState()
+	state := c.sm.GetInternalState()
 	for userID := range state {
 		for roomID := range state[userID] {
 			rs, ok := roomStates[roomID]
@@ -92,25 +116,25 @@ func (c *Convergence) Assert(ctx context.Context, bufferDuration time.Duration) 
 	return nil
 }
 
-func (c *Convergence) assertWithMembers(master CSAPI, roomStates map[string]map[string]State) error {
+func (c *Convergence) assertWithMembers(master CSAPIConvergence, roomStates map[string]map[string]State) error {
 	for roomID, wantRoomState := range roomStates {
 		stateEvents, err := master.Members(roomID)
 		if err != nil {
 			return fmt.Errorf("/members for %s failed: %s", roomID, err)
 		}
 		if err := c.checkRoomState(stateEvents, nil, wantRoomState); err != nil {
-			return fmt.Errorf("room %s from %s perspective mismatch: %s", roomID, master.UserID, err)
+			return fmt.Errorf("room %s from %s perspective mismatch: %s", roomID, master.GetUserID(), err)
 		}
 	}
 	return nil
 }
 
-func (c *Convergence) assertWithSync(master CSAPI, roomStates map[string]map[string]State) error {
+func (c *Convergence) assertWithSync(master CSAPIConvergence, roomStates map[string]map[string]State) error {
 	sr, err := master.Sync(SyncReq{
 		FullState: true,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to /sync on %s : %s", master.UserID, err)
+		return fmt.Errorf("failed to /sync on %s : %s", master.GetUserID(), err)
 	}
 	for roomID, roomState := range roomStates {
 		room, ok := sr.Rooms.Join[roomID]
@@ -118,7 +142,7 @@ func (c *Convergence) assertWithSync(master CSAPI, roomStates map[string]map[str
 			return fmt.Errorf("rooms.join.%s does not exist", roomID)
 		}
 		if err := c.checkRoomState(room.State.Events, room.Timeline.Events, roomState); err != nil {
-			return fmt.Errorf("room %s from %s perspective mismatch: %s", roomID, master.UserID, err)
+			return fmt.Errorf("room %s from %s perspective mismatch: %s", roomID, master.GetUserID(), err)
 		}
 	}
 	return nil
@@ -134,7 +158,7 @@ func (c *Convergence) ensureSynchronised(ctx context.Context) error {
 		for _, roomID := range c.roomIDs {
 			eventID, err := master.SendMessageWithText(roomID, "SYNCHRONISE")
 			if err != nil {
-				return fmt.Errorf("master %s failed to send event in room %s : %s", master.UserID, roomID, err)
+				return fmt.Errorf("master %s failed to send event in room %s : %s", master.GetUserID(), roomID, err)
 			}
 			syncMessages[roomID] = append(syncMessages[roomID], eventID)
 		}
@@ -153,7 +177,7 @@ func (c *Convergence) ensureSynchronised(ctx context.Context) error {
 				syncMessagesCopy[roomID][eventID] = true
 			}
 		}
-		go func(m CSAPI, workingCopy map[string]map[string]bool) {
+		go func(m CSAPIConvergence, workingCopy map[string]map[string]bool) {
 			defer wg.Done()
 
 			for len(workingCopy) > 0 {
@@ -201,7 +225,7 @@ func (c *Convergence) ensureSynchronised(ctx context.Context) error {
 				since = res.NextBatch
 				time.Sleep(1000 * time.Millisecond) // ensure we never hammer the HS
 			} */
-			log.Printf("  %s has synchronised", m.UserID)
+			log.Printf("  %s has synchronised", m.GetUserID())
 		}(master, syncMessagesCopy)
 	}
 	done := make(chan bool)
@@ -221,7 +245,7 @@ func (c *Convergence) ensureSynchronised(ctx context.Context) error {
 }
 
 func (c *Convergence) checkRoomState(stateEvents, timelineEvents []Event, want map[string]State) error {
-	got := make(map[string]State)
+	gotMemberships := make(map[string]Membership)
 	processEvent := func(ev Event) {
 		if ev.Type != "m.room.member" {
 			return
@@ -229,12 +253,23 @@ func (c *Convergence) checkRoomState(stateEvents, timelineEvents []Event, want m
 		if ev.StateKey == nil {
 			return
 		}
-		state := StateLeft
-		switch ev.Content["membership"] {
-		case "join":
-			state = StateJoined
+		gotMemberships[*ev.StateKey] = Membership(ev.Content["membership"].(string))
+	}
+	membershipToState := func(m Membership) State {
+		switch m {
+		case MembershipBan: // TODO
+			fallthrough
+		case MembershipInvite: // TODO
+			fallthrough
+		case MembershipKnock: // TODO
+			fallthrough
+		case MembershipLeave:
+			return StateLeft
+		case MembershipJoin:
+			return StateJoined
+		default:
+			panic("unknown membership: " + m)
 		}
-		got[*ev.StateKey] = state
 	}
 	for _, ev := range stateEvents {
 		processEvent(ev)
@@ -244,11 +279,11 @@ func (c *Convergence) checkRoomState(stateEvents, timelineEvents []Event, want m
 	}
 	errs := []string{}
 	for wantUserID, wantState := range want {
-		if got[wantUserID] == "" {
-			got[wantUserID] = StateLeft
+		if gotMemberships[wantUserID] == "" {
+			gotMemberships[wantUserID] = MembershipLeave
 		}
-		if got[wantUserID] != wantState {
-			errs = append(errs, fmt.Sprintf("user %s is '%s'. Want '%s'", wantUserID, got[wantUserID], wantState))
+		if membershipToState(gotMemberships[wantUserID]) != wantState {
+			errs = append(errs, fmt.Sprintf("user %s is '%s'. Want '%s'", wantUserID, gotMemberships[wantUserID], wantState))
 		}
 	}
 	// we don't explicitly check if the server sends back MORE members than expected, as we do expect this due to

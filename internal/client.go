@@ -294,6 +294,10 @@ func (c *CSAPI) Event(roomID, eventID string) (*Event, error) {
 	return body, nil
 }
 
+func (c *CSAPI) GetUserID() string {
+	return c.UserID
+}
+
 func (c *CSAPI) Do(method string, paths []string, opts ...RequestOpt) (*http.Response, error) {
 	for i := range paths {
 		paths[i] = url.PathEscape(paths[i])

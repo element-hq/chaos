@@ -29,7 +29,9 @@ func NewStorage(filePath string) (*Storage, error) {
 }
 
 func (s *Storage) WriteSnapshot(snap Snapshot) error {
-	fmt.Printf("%+v\n", snap)
+	if len(snap.ProcessEntries) == 0 {
+		return nil
+	}
 	_, err := s.db.NamedExec(
 		`INSERT INTO snapshots(homeserver,process,memory_bytes,cpu_millis) VALUES(:homeserver, :process, :memory_bytes, :cpu_millis)`,
 		snap.ProcessEntries,

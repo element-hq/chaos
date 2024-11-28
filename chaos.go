@@ -86,31 +86,6 @@ func Bootstrap(cfg *config.Chaos) error {
 		}
 	}()
 
-	// print WS traffic
-	go func() {
-		addr := fmt.Sprintf("ws://localhost:%d", cfg.WSPort)
-		log.Printf("Dialling %s\n", addr)
-		c, _, err := websocket.DefaultDialer.Dial(addr, nil)
-		if err != nil {
-			log.Fatal("WS dial:", err)
-		}
-		for {
-			var wsMessage ws.WSMessage
-			if err := c.ReadJSON(&wsMessage); err != nil {
-				log.Fatalf("WS ReadJSON: %s", err)
-			}
-			action := ws.PayloadWorkerAction{}
-			if wsMessage.Type == action.Type() && !cfg.Verbose {
-				continue
-			}
-			payload, err := wsMessage.DecodePayload()
-			if err != nil {
-				log.Fatalf("WS DecodePayload: %s with payload %s", err, string(wsMessage.Payload))
-			}
-			log.Println("> " + payload.String())
-		}
-	}()
-
 	m.Start(cfg.Test.Seed, cfg.Test.OpsPerTick, func(tickIteration int) {
 		doSnapshot(snapshotters, sdb)
 		if cfg.Test.Convergence.Enabled && tickIteration%cfg.Test.Convergence.CheckEveryNTicks == 0 {
@@ -182,6 +157,41 @@ func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain s
 	}
 	lockIDAtomic.Store(lockID)
 	return nil
+}
+
+func PrintTraffic(wsPort int, verbose bool) {
+	addr := fmt.Sprintf("ws://localhost:%d", wsPort)
+	log.Printf("Dialling %s\n", addr)
+	var c *websocket.Conn
+	var err error
+
+	now := time.Now()
+	for c == nil {
+		c, _, err = websocket.DefaultDialer.Dial(addr, nil)
+		if err != nil {
+			log.Printf("WS dial: %s\n", err)
+			time.Sleep(10 * time.Millisecond)
+		}
+		if time.Since(now) > time.Second {
+			log.Fatal("cannot connect to WS server")
+		}
+	}
+
+	for {
+		var wsMessage ws.WSMessage
+		if err := c.ReadJSON(&wsMessage); err != nil {
+			log.Fatalf("WS ReadJSON: %s", err)
+		}
+		action := ws.PayloadWorkerAction{}
+		if wsMessage.Type == action.Type() && !verbose {
+			continue
+		}
+		payload, err := wsMessage.DecodePayload()
+		if err != nil {
+			log.Fatalf("WS DecodePayload: %s with payload %s", err, string(wsMessage.Payload))
+		}
+		log.Println("> " + payload.String())
+	}
 }
 
 func doSnapshot(snapshotters []snapshot.Snapshotter, sdb *snapshot.Storage) {

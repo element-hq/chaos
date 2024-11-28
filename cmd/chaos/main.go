@@ -15,6 +15,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error opening config: %s", err)
 	}
+
+	// print WS traffic
+	go chaos.PrintTraffic(cfg.WSPort, cfg.Verbose)
+
 	if err := chaos.Bootstrap(cfg); err != nil {
 		log.Fatalf("Bootstrap: %s", err)
 	}
