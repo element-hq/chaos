@@ -4,6 +4,7 @@ mitm_proxy:
   container_url: "http://localhost:4050"
   # The domain of the host from mitmproxy's point of view.
   # Typically 'host.docker.internal' but 'host.containers.internal' for podman.
+  # Native linux uses 'host-gateway'
   host_domain: "host.docker.internal"
 # The port to listen on for websocket traffic.
 ws_port: 7406
