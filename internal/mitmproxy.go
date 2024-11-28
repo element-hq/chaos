@@ -33,7 +33,7 @@ func NewClient(proxyURL *url.URL) *Client {
 // See https://docs.mitmproxy.org/stable/concepts-options/ for more
 // information about options.
 func (m *Client) LockOptions(options map[string]any) (lockID []byte, err error) {
-	log.Println("Locking mitmproxy")
+	log.Printf("Locking mitmproxy with options %+v\n", options)
 	jsonBody, err := json.Marshal(map[string]interface{}{
 		"options": options,
 	})
