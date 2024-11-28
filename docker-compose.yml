@@ -7,14 +7,15 @@ services:
     build:
       context: ./demo/synapse
       args:
-        UID: "991"
-    user: 991:991
+        UID: 0
+    user: root
     volumes:
       - ./demo/data/hs1:/data
     environment:
       SYNAPSE_SERVER_NAME: hs1
       HTTP_PROXY: "http://mitmproxy:8080"
       HTTPS_PROXY: "http://mitmproxy:8080"
+      UID: 0
     networks:
       - chaos
     ports:
@@ -23,14 +24,15 @@ services:
     build:
       context: ./demo/synapse
       args:
-        UID: "991"
-    user: 991:991
+        UID: 0
+    user: root
     volumes:
       - ./demo/data/hs2:/data
     environment:
       SYNAPSE_SERVER_NAME: hs2
       HTTP_PROXY: "http://mitmproxy:8080"
       HTTPS_PROXY: "http://mitmproxy:8080"
+      UID: 0
     networks:
       - chaos
     ports:

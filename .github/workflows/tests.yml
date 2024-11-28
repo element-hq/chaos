@@ -28,9 +28,6 @@ jobs:
             - name: Cleanup
               if: always()
               run: |
-                whoami
-                ls -alh /
-                echo $UID
                 ls -alh ./demo/data/hs2
                 docker compose logs
                 docker compose down -t 1 --remove-orphans

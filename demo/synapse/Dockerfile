@@ -8,6 +8,4 @@ RUN wget -O yq "https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_lin
 
 ADD compose-start.sh /compose-start.sh
 RUN chmod 770 /compose-start.sh
-RUN chown $UID /compose-start.sh
-RUN chown $UID /yq
 ENTRYPOINT [ "/compose-start.sh" ]
