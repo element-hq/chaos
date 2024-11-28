@@ -1,5 +1,5 @@
 FROM docker.io/matrixdotorg/synapse:v1.120.0
-
+ARG UID=1000
 
 # for munging the config it spits out
 RUN apt-get update && apt install wget patch -y
