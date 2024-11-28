@@ -1,0 +1,42 @@
+mitm_proxy:
+  # The location of the mitmproxy from Chaos' perspective.
+  # This needs to be running with the callback addon.
+  container_url: "http://localhost:4050"
+  # The domain of the host from mitmproxy's point of view.
+  # Typically 'host.docker.internal' but 'host.containers.internal' for podman.
+  host_domain: "host.docker.internal"
+# The port to listen on for websocket traffic.
+ws_port: 7406
+# Enable moar logging
+verbose: false
+homeservers:
+  - # The client-server API endpoint for the server
+    url: "https://localhost:4051"
+    # Docker-network domain name, also the name used in the domain part of user IDs
+    domain: hs1
+  - url: "https://localhost:4052"
+    domain: hs2
+# Test runtime configuration
+test:
+  # PRNG seed
+  seed: 42
+  # Number of users to create. This is round-robined on the number of servers.
+  num_users: 8
+  # Number of rooms to create. The creator is round-robined on the number of servers.
+  num_rooms: 2
+  # How many join/sends/leaves to do per tick.
+  ops_per_tick: 50
+  netsplits:
+    # How long netsplits last. If 0, no netsplits.
+    duration_secs: 4
+    # How long after a netsplit before netsplitting again.
+    free_secs: 10
+  convergence:
+    # Enable convergence checks.
+    enabled: true
+    # Check for convergence at the end of every N ticks.
+    check_every_n_ticks: 10
+    # After synchronising, how long to wait to flush through any remaining traffic.
+    buffer_secs: 3
+  # Where to write metrics to.
+  snapshot_db: load2.sqlite3

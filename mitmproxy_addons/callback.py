@@ -64,14 +64,20 @@ class Callback:
             req_body = flow.request.json()
         except Exception:
             req_body = None
-        print(f'{datetime.now().strftime("%H:%M:%S.%f")} hitting request callback for {flow.request.url}')
+        print(
+            f'{datetime.now().strftime("%H:%M:%S.%f")} hitting request callback for {flow.request.url}'
+        )
         callback_body = {
             "method": flow.request.method,
-            "access_token": flow.request.headers.get("Authorization", "").removeprefix("Bearer "),
+            "access_token": flow.request.headers.get("Authorization", "").removeprefix(
+                "Bearer "
+            ),
             "url": flow.request.url,
             "request_body": req_body,
         }
-        await self.send_callback(flow, self.config["callback_request_url"], callback_body)
+        await self.send_callback(
+            flow, self.config["callback_request_url"], callback_body
+        )
 
     async def response(self, flow):
         # always ignore the controller
@@ -88,16 +94,22 @@ class Callback:
                 res_body = flow.response.json()
             except Exception:
                 res_body = None
-            print(f'{datetime.now().strftime("%H:%M:%S.%f")} hitting response callback for {flow.request.url}')
+            print(
+                f'{datetime.now().strftime("%H:%M:%S.%f")} hitting response callback for {flow.request.url}'
+            )
             callback_body = {
                 "method": flow.request.method,
-                "access_token": flow.request.headers.get("Authorization", "").removeprefix("Bearer "),
+                "access_token": flow.request.headers.get(
+                    "Authorization", ""
+                ).removeprefix("Bearer "),
                 "url": flow.request.url,
                 "response_code": flow.response.status_code,
                 "request_body": req_body,
                 "response_body": res_body,
             }
-            await self.send_callback(flow, self.config["callback_response_url"], callback_body)
+            await self.send_callback(
+                flow, self.config["callback_response_url"], callback_body
+            )
 
     async def send_callback(self, flow, url: str, body: dict):
         try:
@@ -110,21 +122,29 @@ class Callback:
                 json=body,
             ) as response:
                 print(
-                    f"{datetime.now().strftime("%H:%M:%S.%f")} callback "
+                    f'{datetime.now().strftime("%H:%M:%S.%f")} callback '
                     + f"for {flow.request.url} returned HTTP {response.status}"
                 )
                 if response.content_type != "application/json":
                     err_response_body = await response.text()
-                    print(f"ERR: callback server returned non-json: {err_response_body}")
-                    raise Exception("callback server content-type: " + response.content_type)
+                    print(
+                        f"ERR: callback server returned non-json: {err_response_body}"
+                    )
+                    raise Exception(
+                        "callback server content-type: " + response.content_type
+                    )
                 test_response_body = await response.json()
                 # if the response includes some keys then we are modifying the response on a per-key basis.
                 if len(test_response_body) > 0:
                     # use what fields were provided preferentially.
                     # For requests: both fields must be provided so the default case won't execute.
                     # For responses: fields are optional but the default case is always specified.
-                    respond_status_code = test_response_body.get("respond_status_code", body.get("response_code"))
-                    respond_body = test_response_body.get("respond_body", body.get("response_body"))
+                    respond_status_code = test_response_body.get(
+                        "respond_status_code", body.get("response_code")
+                    )
+                    respond_body = test_response_body.get(
+                        "respond_body", body.get("response_body")
+                    )
                     print(
                         f'{datetime.now().strftime("%H:%M:%S.%f")} callback for {flow.request.url} '
                         + f"returning custom response: HTTP {respond_status_code} {json.dumps(respond_body)}"

@@ -2,19 +2,29 @@
 
 Chaos is a partition/fault tolerance testing tool for homeservers. It can deterministically cause netsplits and restart servers, and periodically checks for convergence by ensuring all homeservers see the same member list as every other server.
 
+### Quick Start
+```
+go build ./cmd/chaos
+docker compose up -d
+./chaos -config config.demo.yaml
+```
+
 ### Running
 
 To setup Chaos with your homeservers, you need:
  - to run the homeservers in a single docker network,
- - to set `HTTP_PROXY` and `HTTPS_PROXY` environment variables to the constant `http://mitm-proxy`,
- - to tell Chaos the network name to hook into.
+ - to set `HTTP_PROXY` and `HTTPS_PROXY` environment variables to the constant `http://mitmproxy`,
+ - run a vanilla mitmproxy in the same docker network with the container name `mitmproxy`.
 
 Once you've done this, build and run chaos:
 - Build the binary: `go build ./cmd/chaos`.
 - Edit the config file: `config.yml`.
 - Run it: `./chaos -c config.yml`
 
-Note: The homeservers do NOT need to be Complement-compatible. Demo scripts do however use Complement-compatible servers simply because it's easy.
+Note: The homeservers do NOT need to be Complement-compatible. To run the demo: `docker-compose up` which:
+ - spins up two homeservers with env vars set
+ - spins up a mitmproxy
+then `./chaos -config config.demo.yaml`.
 
 ### Architecture / Dev Notes
 

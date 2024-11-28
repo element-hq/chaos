@@ -1,0 +1,40 @@
+version: '3'
+
+networks:
+  chaos:
+
+
+services:
+  hs1:
+    build: ./demo/synapse
+    volumes:
+      - ./demo/data/hs1:/data
+    environment:
+      SYNAPSE_SERVER_NAME: hs1
+      HTTP_PROXY: "http://mitmproxy:8080"
+      HTTPS_PROXY: "http://mitmproxy:8080"
+    networks:
+      - chaos
+    ports:
+      - 4051:443
+  hs2:
+    build: ./demo/synapse
+    volumes:
+      - ./demo/data/hs2:/data
+    environment:
+      SYNAPSE_SERVER_NAME: hs2
+      HTTP_PROXY: "http://mitmproxy:8080"
+      HTTPS_PROXY: "http://mitmproxy:8080"
+    networks:
+      - chaos
+    ports:
+      - 4052:443
+  mitmproxy:
+    image: mitmproxy/mitmproxy:10.1.5
+    command: "mitmdump --set  ssl_insecure=true -s /addons/__init__.py"
+    volumes:
+      - "./mitmproxy_addons:/addons"
+    networks:
+      - chaos
+    ports:
+      - 4050:8080

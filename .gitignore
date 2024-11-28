@@ -1,3 +1,4 @@
 load.sqlite3
 config.yaml
 __pycache__
+data
