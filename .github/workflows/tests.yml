@@ -22,7 +22,7 @@ jobs:
             - name: Run Demo
               run: |
                 docker compose up -d
-                sleep 5
+                bash -c 'while [[ "$(curl -s -k -o /dev/null -w ''%{http_code}'' https://localhost:4052/_matrix/client/versions)" != "200" ]]; do sleep 1; done'
                 ./chaos -config config.demo.yaml -timeout_secs 25
                 docker compose down -t 1 --remove-orphans
     tests:
