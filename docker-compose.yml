@@ -7,6 +7,7 @@ networks:
 services:
   hs1:
     build: ./demo/synapse
+    user: root
     volumes:
       - ./demo/data/hs1:/data
     environment:
@@ -19,6 +20,7 @@ services:
       - 4051:443
   hs2:
     build: ./demo/synapse
+    user: root
     volumes:
       - ./demo/data/hs2:/data
     environment:
@@ -31,6 +33,7 @@ services:
       - 4052:443
   mitmproxy:
     image: mitmproxy/mitmproxy:10.1.5
+    user: root
     command: "mitmdump --set  ssl_insecure=true -s /addons/__init__.py"
     volumes:
       - "./mitmproxy_addons:/addons"
