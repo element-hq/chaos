@@ -23,6 +23,7 @@ jobs:
               run: |
                 docker compose build --build-arg "UID=$UID"
                 docker compose up -d
+                curl --head -k -XGET --retry 20 --retry-all-errors --retry-delay 1 https://localhost:4051/_matrix/client/versions
                 curl --head -k -XGET --retry 20 --retry-all-errors --retry-delay 1 https://localhost:4052/_matrix/client/versions
                 ./chaos -config config.demo.yaml -timeout_secs 25
             - name: Cleanup
