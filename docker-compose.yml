@@ -11,6 +11,8 @@ services:
     user: root
     volumes:
       - ./demo/data/hs1:/data
+    extra_hosts:
+      - host.docker.internal=host-gateway
     environment:
       SYNAPSE_SERVER_NAME: hs1
       HTTP_PROXY: "http://mitmproxy:8080"
