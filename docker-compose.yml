@@ -5,6 +5,7 @@ networks:
 services:
   hs1:
     build: ./demo/synapse
+    user: 991:991
     volumes:
       - ./demo/data/hs1:/data
     environment:
@@ -17,6 +18,7 @@ services:
       - 4051:443
   hs2:
     build: ./demo/synapse
+    user: 991:991
     volumes:
       - ./demo/data/hs2:/data
     environment:
