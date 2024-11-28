@@ -4,7 +4,10 @@ networks:
 
 services:
   hs1:
-    build: ./demo/synapse
+    build:
+      context: ./demo/synapse
+      args:
+        UID: "991"
     user: 991:991
     volumes:
       - ./demo/data/hs1:/data
@@ -17,7 +20,10 @@ services:
     ports:
       - 4051:443
   hs2:
-    build: ./demo/synapse
+    build:
+      context: ./demo/synapse
+      args:
+        UID: "991"
     user: 991:991
     volumes:
       - ./demo/data/hs2:/data
