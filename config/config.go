@@ -1,0 +1,55 @@
+package config
+
+import (
+	"fmt"
+	"os"
+
+	yaml "gopkg.in/yaml.v3"
+)
+
+type Chaos struct {
+	Verbose   bool `yaml:"verbose"`
+	WSPort    int  `yaml:"ws_port"`
+	MITMProxy struct {
+		ContainerURL string `yaml:"container_url"`
+		HostDomain   string `yaml:"host_domain"`
+	} `yaml:"mitm_proxy"`
+	Homeservers []HomeserverConfig `yaml:"homeservers"`
+	Test        struct {
+		Seed       int64 `yaml:"seed"`
+		NumUsers   int   `yaml:"num_users"`
+		NumRooms   int   `yaml:"num_rooms"`
+		OpsPerTick int   `yaml:"ops_per_tick"`
+		Netsplits  struct {
+			DurationSecs int `yaml:"duration_secs"`
+			FreeSecs     int `yaml:"free_secs"`
+		} `yaml:"netsplits"`
+		Convergence struct {
+			Enabled            bool `yaml:"enabled"`
+			CheckEveryNTicks   int  `yaml:"check_every_n_ticks"`
+			BufferDurationSecs int  `yaml:"buffer_secs"`
+		}
+		SnapshotDB string `yaml:"snapshot_db"` // path to sqlite3 file to write snapshot data to
+	} `yaml:"test"`
+}
+
+type HomeserverConfig struct {
+	BaseURL  string `yaml:"url"`
+	Domain   string `yaml:"domain"`
+	Snapshot struct {
+		Type string         `yaml:"type"`
+		Data map[string]any `yaml:"data"` // custom data for the snapshot type
+	} `yaml:"snapshot"`
+}
+
+func OpenFile(cfgPath string) (*Chaos, error) {
+	input, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("ReadFile %s: %s", cfgPath, err)
+	}
+	var cfg Chaos
+	if err := yaml.Unmarshal(input, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %s", err)
+	}
+	return &cfg, nil
+}
