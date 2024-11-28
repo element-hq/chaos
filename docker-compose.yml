@@ -7,7 +7,7 @@ networks:
 services:
   hs1:
     build: ./demo/synapse
-    user: root
+    user: "991:991" # ensures tls keys made at startup use the same uid as the python process
     volumes:
       - ./demo/data/hs1:/data
     environment:
@@ -20,7 +20,7 @@ services:
       - 4051:443
   hs2:
     build: ./demo/synapse
-    user: root
+    user: "991:991"
     volumes:
       - ./demo/data/hs2:/data
     environment:
@@ -33,7 +33,6 @@ services:
       - 4052:443
   mitmproxy:
     image: mitmproxy/mitmproxy:10.1.5
-    user: root
     command: "mitmdump --set  ssl_insecure=true -s /addons/__init__.py"
     volumes:
       - "./mitmproxy_addons:/addons"
