@@ -14,17 +14,15 @@ docker compose up -d
 To setup Chaos with your homeservers, you need:
  - to run the homeservers in a single docker network,
  - to set `HTTP_PROXY` and `HTTPS_PROXY` environment variables to the constant `http://mitmproxy`,
- - run a vanilla mitmproxy in the same docker network with the container name `mitmproxy`.
+ - run a mitmproxy in the same docker network with the container name `mitmproxy` with the
+   args: `mitmdump --set  ssl_insecure=true -s /addons/__init__.py` and volume `./mitmproxy_addons:/addons`.
 
 Once you've done this, build and run chaos:
 - Build the binary: `go build ./cmd/chaos`.
 - Edit the config file: `config.yml`.
 - Run it: `./chaos -c config.yml`
 
-Note: The homeservers do NOT need to be Complement-compatible. To run the demo: `docker-compose up` which:
- - spins up two homeservers with env vars set
- - spins up a mitmproxy
-then `./chaos -config config.demo.yaml`.
+Note: The homeservers do NOT need to be Complement-compatible.
 
 ### Architecture / Dev Notes
 
