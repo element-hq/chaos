@@ -12,7 +12,7 @@ services:
     volumes:
       - ./demo/data/hs1:/data
     extra_hosts:
-      - host.docker.internal=host-gateway
+      - host.docker.internal:172.17.0.1
     environment:
       SYNAPSE_SERVER_NAME: hs1
       HTTP_PROXY: "http://mitmproxy:8080"
@@ -30,6 +30,8 @@ services:
     user: root
     volumes:
       - ./demo/data/hs2:/data
+    extra_hosts:
+      - host.docker.internal:172.17.0.1
     environment:
       SYNAPSE_SERVER_NAME: hs2
       HTTP_PROXY: "http://mitmproxy:8080"
