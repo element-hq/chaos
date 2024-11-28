@@ -1,12 +1,6 @@
 #!/bin/bash -eu
 export SYNAPSE_REPORT_STATS=no
 
-cat /etc/hosts
-apt update && apt install -y iputils-ping
-ping host.docker.internal -c 2 || echo 'no'
-ping host-gateway -c 2 || echo 'no'
-ping 172.17.0.1 -c 2 || echo 'no'
-
 if [ -f /data/homeserver.yaml ]; then
     echo "homeserver.yaml already detected, not regenerating config"
     /start.py run

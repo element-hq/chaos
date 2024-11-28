@@ -28,8 +28,6 @@ services:
     user: root
     volumes:
       - ./demo/data/hs2:/data
-    extra_hosts:
-      - host-gateway=172.17.0.1
     environment:
       SYNAPSE_SERVER_NAME: hs2
       HTTP_PROXY: "http://mitmproxy:8080"
@@ -44,6 +42,8 @@ services:
     command: "mitmdump --set  ssl_insecure=true -s /addons/__init__.py"
     volumes:
       - "./mitmproxy_addons:/addons"
+    extra_hosts:
+      - host.docker.internal=172.17.0.1
     networks:
       - chaos
     ports:
