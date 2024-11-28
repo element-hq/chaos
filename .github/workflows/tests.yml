@@ -6,6 +6,25 @@ on:
     pull_request:
 
 jobs:
+    demo:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Setup | Go
+              uses: actions/setup-go@v4
+              with:
+                go-version: '1.21'
+
+            - name: Build
+              run: go build ./cmd/chaos
+
+            - name: Run Demo
+              run: |
+                docker compose up -d
+                sleep 5
+                ./chaos -config config.demo.yaml -timeout_secs 25
+                docker compose down -t 1 --remove-orphans
     tests:
         runs-on: ubuntu-latest
 
