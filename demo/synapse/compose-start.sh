@@ -1,4 +1,4 @@
-#!/bin/bash -eu
+#!/bin/bash -e
 export SYNAPSE_REPORT_STATS=no
 
 if [ -f /data/homeserver.yaml ]; then
@@ -31,6 +31,14 @@ echo " ====== Generating config  ====== "
 # Listen on :443 and serve up a .well-known response pointing to :443
 /yq -i '.listeners = [{"port":443,"tls":true,"type":"http","resources":[{"names":["client","federation"]}]}]' /data/homeserver.yaml
 /yq -i ".serve_server_wellknown = true" /data/homeserver.yaml
+
+# if postgres env vars are provided, use them instead of sqlite
+if [[ -z $POSTGRES_DB || -z $POSTGRES_HOST || -z $POSTGRES_USER || -z $POSTGRES_PASSWORD ]]; then
+  echo 'running in sqlite mode'
+else
+  echo 'running in postgres mode'
+  /yq -i ".database = {\"name\":\"psycopg2\", \"args\":{\"user\":\"$POSTGRES_USER\",\"password\":\"$POSTGRES_PASSWORD\",\"dbname\":\"$POSTGRES_DB\",\"host\":\"$POSTGRES_HOST\",\"cp_min\":5,\"cp_max\":10}}" /data/homeserver.yaml
+fi
 
 # set rate limiting stuff
 /yq -i '.rc_message = {"per_second":1000,"burst_count":1000}' /data/homeserver.yaml

@@ -3,6 +3,24 @@ networks:
 
 
 services:
+  postgres1:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    shm_size: 128mb
+    volumes:
+      - ./demo/data/postgres1:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      start_period: "1s"
+      interval: "1s"
+      timeout: "5s"
+    networks:
+      - chaos
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: synapse
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
   hs1:
     build:
       context: ./demo/synapse
@@ -13,9 +31,16 @@ services:
       - ./demo/data/hs1:/data
     environment:
       SYNAPSE_SERVER_NAME: hs1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: synapse
+      POSTGRES_HOST: postgres1
       HTTP_PROXY: "http://mitmproxy:8080"
       HTTPS_PROXY: "http://mitmproxy:8080"
       UID: 0
+    depends_on:
+      postgres1:
+        condition: service_healthy
     networks:
       - chaos
     ports:
