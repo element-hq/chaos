@@ -19,6 +19,13 @@ homeservers:
     #   type: docker
     #   data:
     #     container_name: hs1
+    # Optional. Whether to restart servers and how to do so.
+    # restart:
+    #   type: docker
+    #   config:
+    #     timeout_secs: 3
+    #     signal: SIGTERM  # can SIGKILL to test ungraceful shutdown.
+    #     container_name: hs1
   - url: "http://localhost:8009"
     domain: hs2
     # snapshot:
@@ -40,6 +47,9 @@ test:
     duration_secs: 4
     # How long after a netsplit before netsplitting again.
     free_secs: 10
+  restarts:
+    # How often to restart servers
+    interval_secs: 60
   convergence:
     # Enable convergence checks.
     enabled: true

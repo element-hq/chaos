@@ -14,14 +14,19 @@ import (
 	"github.com/element-hq/chaos/config"
 	"github.com/element-hq/chaos/internal"
 	"github.com/element-hq/chaos/internal/ws"
+	"github.com/element-hq/chaos/restart"
 	"github.com/element-hq/chaos/snapshot"
 	"github.com/gorilla/websocket"
 )
 
 type CreateSnapshotter func(hsc config.HomeserverConfig) (snapshot.Snapshotter, error)
+type CreateRestarter func(hsc config.HomeserverConfig) (restart.Restarter, error)
 
 var snapshotTypes = map[string]CreateSnapshotter{
 	snapshot.SnapshotTypeDocker: snapshot.NewDockerSnapshotter,
+}
+var restartTypes = map[string]CreateRestarter{
+	restart.RestartTypeDocker: restart.NewDockerRestarter,
 }
 
 // RegisterSnapshotter registers a new snapshot type with Chaos.
@@ -31,9 +36,17 @@ func RegisterSnapshotter(snapshotType string, snapshotterCreateFn CreateSnapshot
 	snapshotTypes[snapshotType] = snapshotterCreateFn
 }
 
+// RegisterRestarter registers a new restart type with Chaos.
+// The provided function will be invoked for any homeserver config which contains
+// the provided restart.type.
+func RegisterRestarter(restartType string, restarterCreateFn CreateRestarter) {
+	restartTypes[restartType] = restarterCreateFn
+}
+
 // Bootstrap is the entry point for running Chaos.
 func Bootstrap(cfg *config.Chaos) error {
 	var snapshotters []snapshot.Snapshotter
+	var restarters []restart.Restarter
 	for _, hs := range cfg.Homeservers {
 		if hs.Snapshot.Type != "" {
 			snapshotCreator := snapshotTypes[hs.Snapshot.Type]
@@ -45,6 +58,17 @@ func Bootstrap(cfg *config.Chaos) error {
 				return fmt.Errorf("hs %s : failed to create snapshotter of type %s: %s", hs.Domain, hs.Snapshot.Type, err)
 			}
 			snapshotters = append(snapshotters, snapshotter)
+		}
+		if hs.Restart.Type != "" {
+			restartCreator := restartTypes[hs.Restart.Type]
+			if restartCreator == nil {
+				return fmt.Errorf("hs %s has an unsupported restart type: %s", hs.Domain, hs.Restart.Type)
+			}
+			restarter, err := restartCreator(hs)
+			if err != nil {
+				return fmt.Errorf("hs %s : failed to create restarter of type %s: %s", hs.Domain, hs.Restart.Type, err)
+			}
+			restarters = append(restarters, restarter)
 		}
 	}
 
@@ -85,6 +109,27 @@ func Bootstrap(cfg *config.Chaos) error {
 			time.Sleep(time.Duration(cfg.Test.Netsplits.DurationSecs) * time.Second)
 		}
 	}()
+
+	if cfg.Test.Restarts.IntervalSecs > 0 && len(restarters) > 0 {
+		log.Printf("Tests with restarts every %d seconds\n", cfg.Test.Restarts.IntervalSecs)
+		go func() {
+			i := 0
+			for {
+				time.Sleep(time.Duration(cfg.Test.Restarts.IntervalSecs) * time.Second)
+				r := restarters[i%len(restarters)]
+				wsServer.Send(&ws.PayloadRestart{
+					Domain:   r.Config().Domain,
+					Finished: false,
+				})
+				r.Restart()
+				wsServer.Send(&ws.PayloadRestart{
+					Domain:   r.Config().Domain,
+					Finished: true,
+				})
+				i++
+			}
+		}()
+	}
 
 	m.Start(cfg.Test.Seed, cfg.Test.OpsPerTick, func(tickIteration int) {
 		doSnapshot(snapshotters, sdb)

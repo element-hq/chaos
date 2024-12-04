@@ -12,6 +12,10 @@ import (
 
 const SnapshotTypeDocker = "docker"
 
+type DockerConfig struct {
+	ContainerName string `yaml:"container_name"`
+}
+
 type DockerSnapshotter struct {
 	apiClient     *client.Client
 	hsConfig      config.HomeserverConfig
@@ -23,9 +27,13 @@ func NewDockerSnapshotter(hsc config.HomeserverConfig) (Snapshotter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client from env: %s", err)
 	}
+	snapshotConfig, err := config.UnmarshalInto[DockerConfig](hsc.Snapshot.Data)
+	if err != nil {
+		return nil, fmt.Errorf("invalid config: %s", err)
+	}
 	return &DockerSnapshotter{
 		apiClient:     apiClient,
-		containerName: hsc.Snapshot.Data["container_name"].(string),
+		containerName: snapshotConfig.ContainerName,
 		hsConfig:      hsc,
 	}, nil
 }

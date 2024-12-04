@@ -43,6 +43,8 @@ func (w *WSMessage) DecodePayload() (WSPayload, error) {
 		return decodeAs[*PayloadNetsplit](w)
 	case "PayloadConvergence":
 		return decodeAs[*PayloadConvergence](w)
+	case "PayloadRestart":
+		return decodeAs[*PayloadRestart](w)
 	default:
 		return nil, fmt.Errorf("unknown type: %s", w.Type)
 	}
@@ -136,6 +138,22 @@ func (w *PayloadConvergence) String() string {
 
 func (w *PayloadConvergence) Type() string {
 	return "PayloadConvergence"
+}
+
+type PayloadRestart struct {
+	Domain   string
+	Finished bool
+}
+
+func (w *PayloadRestart) String() string {
+	if w.Finished {
+		return fmt.Sprintf("Restarted server '%s'", w.Domain)
+	}
+	return fmt.Sprintf("Restarting server '%s'", w.Domain)
+}
+
+func (w *PayloadRestart) Type() string {
+	return "PayloadRestart"
 }
 
 type PayloadSnapshot struct {

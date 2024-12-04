@@ -17,6 +17,12 @@ homeservers:
     domain: hs1
   - url: "https://localhost:4052"
     domain: hs2
+    restart:
+      type: docker
+      config:
+        timeout_secs: 3
+        signal: SIGTERM  # can SIGKILL to test ungraceful shutdown.
+        container_name: chaos-hs2-1
 # Test runtime configuration
 test:
   # PRNG seed
@@ -32,6 +38,9 @@ test:
     duration_secs: 4
     # How long after a netsplit before netsplitting again.
     free_secs: 10
+  restarts:
+    # How often to restart servers
+    interval_secs: 45
   convergence:
     # Enable convergence checks.
     enabled: true

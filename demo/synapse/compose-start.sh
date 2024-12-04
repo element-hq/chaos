@@ -32,6 +32,12 @@ echo " ====== Generating config  ====== "
 /yq -i '.listeners = [{"port":443,"tls":true,"type":"http","resources":[{"names":["client","federation"]}]}]' /data/homeserver.yaml
 /yq -i ".serve_server_wellknown = true" /data/homeserver.yaml
 
+# Reduce backoff timers on federation for testing
+/yq -i '.federation.destination_max_retry_interval = "10s"' /data/homeserver.yaml
+/yq -i '.federation.destination_min_retry_interval = "1s"' /data/homeserver.yaml
+/yq -i '.federation.max_short_retry_delay = "10s"' /data/homeserver.yaml
+/yq -i '.federation.max_long_retry_delay = "10s"' /data/homeserver.yaml
+
 # if postgres env vars are provided, use them instead of sqlite
 if [[ -z $POSTGRES_DB || -z $POSTGRES_HOST || -z $POSTGRES_USER || -z $POSTGRES_PASSWORD ]]; then
   echo 'running in sqlite mode'

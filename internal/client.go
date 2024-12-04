@@ -11,7 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+const MaxSendAttempts = 30 // 30s
 
 var adjectives = []string{
 	"angry",
@@ -335,8 +338,19 @@ func (c *CSAPI) Do(method string, paths []string, opts ...RequestOpt) (*http.Res
 		log.Printf("%s : %s %s %s", c.UserID, method, req.URL.Path, bodyStr)
 	}
 	// Perform the HTTP request
-	res, err := c.Client.Do(req)
-	if err != nil {
+	var res *http.Response
+	attempts := 0
+	for attempts < MaxSendAttempts {
+		attempts++
+		res, err = c.Client.Do(req)
+		if err == nil {
+			break
+		}
+		// could be a network error, log and try again
+		log.Printf("%s : %s %s returned error %s - attempt %d/%d retrying in 1s\n", c.UserID, method, req.URL.Path, err, attempts, MaxSendAttempts)
+		time.Sleep(time.Second)
+	}
+	if res == nil {
 		return nil, fmt.Errorf("CSAPI.Do response returned error: %s", err)
 	}
 	// debug log the response
