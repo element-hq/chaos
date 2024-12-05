@@ -322,16 +322,22 @@ func (c *CSAPI) Do(method string, paths []string, opts ...RequestOpt) (*http.Res
 	if req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+
+	copyRequestBody := func() []byte {
+		if req.Body == nil {
+			return nil
+		}
+		body, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(body))
+		return body
+	}
+	bodyCopy := copyRequestBody()
 	// debug log the request
 	if c.Debug {
 		var bodyStr string
 		contentType := req.Header.Get("Content-Type")
 		if contentType == "application/json" || strings.HasPrefix(contentType, "text/") {
-			if req.Body != nil {
-				body, _ := io.ReadAll(req.Body)
-				bodyStr = fmt.Sprintf("Request body: %s", string(body))
-				req.Body = io.NopCloser(bytes.NewBuffer(body))
-			}
+			bodyStr = string(bodyCopy)
 		} else {
 			bodyStr = fmt.Sprintf("Request body: <binary:%s>", contentType)
 		}
@@ -349,6 +355,8 @@ func (c *CSAPI) Do(method string, paths []string, opts ...RequestOpt) (*http.Res
 		// could be a network error, log and try again
 		log.Printf("%s : %s %s returned error %s - attempt %d/%d retrying in 1s\n", c.UserID, method, req.URL.Path, err, attempts, MaxSendAttempts)
 		time.Sleep(time.Second)
+		// reset the body so it can be reconsumed
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyCopy))
 	}
 	if res == nil {
 		return nil, fmt.Errorf("CSAPI.Do response returned error: %s", err)

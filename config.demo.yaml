@@ -40,7 +40,7 @@ test:
     free_secs: 10
   restarts:
     # How often to restart servers
-    interval_secs: 45
+    interval_secs: 25
   convergence:
     # Enable convergence checks.
     enabled: true

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -160,6 +161,16 @@ func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain s
 	}
 	cbURL := cbServer.SetOnRequestCallback(func(d internal.Data) *internal.Response {
 		block := shouldBlock()
+		if block && strings.HasSuffix(d.URL, "/.well-known/matrix/server") {
+			// allow .well-known lookups. This is a bit horrible as it means netsplits aren't
+			// truly netsplits, but Synapse has an in-memory cache of well-known respones, so
+			// when it gets restarted it does them again which can fail if the restart happens during a netsplit.
+			// If that happens, Synapse has a hardcoded 2min retry
+			// See https://github.com/element-hq/synapse/blob/a00d0b3d0e72cd56733c30b1b52b5402c92f81cc/synapse/http/federation/well_known_resolver.py#L51-L53
+			// which then causes chaos to time out as it doesn't expect operations to take that long.
+			// These timeouts should be configurable.
+			block = false
+		}
 		wsServer.Send(&ws.PayloadFederationRequest{
 			Method:  d.Method,
 			URL:     d.URL,
