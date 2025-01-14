@@ -9,6 +9,11 @@ docker compose up -d
 ./chaos -config config.demo.yaml
 ```
 
+To access the databases of the demo servers:
+```
+$ ./demo/database_repl.sh hs1 # or hs2
+```
+
 ### Running
 
 To setup Chaos with your homeservers, you need:
