@@ -19,11 +19,12 @@ type Chaos struct {
 }
 
 type TestConfig struct {
-	Seed       int64 `yaml:"seed"`
-	NumUsers   int   `yaml:"num_users"`
-	NumRooms   int   `yaml:"num_rooms"`
-	OpsPerTick int   `yaml:"ops_per_tick"`
-	Netsplits  struct {
+	Seed        int64  `yaml:"seed"`
+	NumUsers    int    `yaml:"num_users"`
+	NumRooms    int    `yaml:"num_rooms"`
+	OpsPerTick  int    `yaml:"ops_per_tick"`
+	RoomVersion string `yaml:"room_version"`
+	Netsplits   struct {
 		DurationSecs int `yaml:"duration_secs"`
 		FreeSecs     int `yaml:"free_secs"`
 	} `yaml:"netsplits"`

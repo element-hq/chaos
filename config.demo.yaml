@@ -31,6 +31,8 @@ test:
   num_users: 8
   # Number of rooms to create. The creator is round-robined on the number of servers.
   num_rooms: 2
+  # The room version to test against. If empty, uses the default room version for the HS.
+  # room_version: "11"
   # How many join/sends/leaves to do per tick.
   ops_per_tick: 50
   netsplits:

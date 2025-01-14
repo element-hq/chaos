@@ -64,9 +64,13 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	for i := 0; i < cfg.Test.NumRooms; i++ {
 		creatorIndex := i % len(masters)
 		creator := masters[creatorIndex]
-		roomID, err := creator.CreateRoom(map[string]interface{}{
+		createOpts := map[string]interface{}{
 			"preset": "public_chat",
-		})
+		}
+		if cfg.Test.RoomVersion != "" {
+			createOpts["room_version"] = cfg.Test.RoomVersion
+		}
+		roomID, err := creator.CreateRoom(createOpts)
 		if err != nil {
 			return fmt.Errorf("%s failed to create room: %s", creator.UserID, err)
 		}
