@@ -133,9 +133,9 @@ func (m *Master) StartWorkers(numWorkers, opsPerTick int) {
 	}
 }
 
-func (m *Master) Start(seed int64, opsPerTick int, postTickFn func(tickIteration int)) {
+func (m *Master) Start(postTickFn func(tickIteration int)) {
 	userIDs := slices.Collect(maps.Keys(m.userIDToWorker))
-	stateMachine := NewStateMachine(seed, opsPerTick, userIDs, m.roomIDs)
+	stateMachine := NewStateMachine(m.cfg.Test.Seed, m.cfg.Test.OpsPerTick, m.cfg.Test.SendToLeaveProbability, userIDs, m.roomIDs)
 	convMasters := make([]CSAPIConvergence, len(m.masters))
 	for i := range convMasters {
 		convMasters[i] = &m.masters[i]

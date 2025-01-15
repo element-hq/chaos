@@ -13,7 +13,7 @@ func TestStateMachineOnlyDoesValidTransitions(t *testing.T) {
 		StateSend:   {StateSend, StateLeft},
 		StateStart:  {StateJoined},
 	}
-	sm := NewStateMachine(42, 10, []string{"alice", "bob"}, []string{"!foo", "!bar", "!baz"})
+	sm := NewStateMachine(42, 10, 10, []string{"alice", "bob"}, []string{"!foo", "!bar", "!baz"})
 
 	for i := 0; i < 100; i++ {
 		cmds := sm.Tick()
@@ -31,12 +31,12 @@ func TestStateMachineOnlyDoesValidTransitions(t *testing.T) {
 }
 
 func TestStateMachineIsDeterministic(t *testing.T) {
-	sm := NewStateMachine(42, 4, []string{"alice", "bob"}, []string{"!foo", "!bar", "!baz"})
+	sm := NewStateMachine(42, 4, 10, []string{"alice", "bob"}, []string{"!foo", "!bar", "!baz"})
 	cmds := sm.Tick()
 	sm.Apply(cmds)
 	want := sm.userToRoomStates
 	for i := 0; i < 100; i++ {
-		sm := NewStateMachine(42, 4, []string{"bob", "alice"}, []string{"!foo", "!baz", "!bar"})
+		sm := NewStateMachine(42, 4, 10, []string{"bob", "alice"}, []string{"!foo", "!baz", "!bar"})
 		cmds := sm.Tick()
 		sm.Apply(cmds)
 		if !reflect.DeepEqual(sm.userToRoomStates, want) {

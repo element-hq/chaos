@@ -132,7 +132,7 @@ func Bootstrap(cfg *config.Chaos) error {
 		}()
 	}
 
-	m.Start(cfg.Test.Seed, cfg.Test.OpsPerTick, func(tickIteration int) {
+	m.Start(func(tickIteration int) {
 		doSnapshot(snapshotters, sdb)
 		if cfg.Test.Convergence.Enabled && tickIteration%cfg.Test.Convergence.CheckEveryNTicks == 0 {
 			// TODO: stop the netsplit goroutine from spliting during this process.

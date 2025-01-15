@@ -42,6 +42,10 @@ test:
   num_rooms: 2
   # How many join/sends/leaves to do per tick.
   ops_per_tick: 50
+  # number between 0-100 which is the % chance the user leaves the room instead of sending a message
+  # higher numbers cause more membership transitions overall which stresses the server in different ways.
+  # if 100, never sends messages.
+  send_to_leave_probability: 10
   netsplits:
     # How long netsplits last. If 0, no netsplits.
     duration_secs: 4

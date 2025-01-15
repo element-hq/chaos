@@ -15,15 +15,16 @@ var (
 )
 
 type StateMachine struct {
-	Index            int
-	source           rand.Source
-	opsPerTick       int
-	userIDs          []string
-	roomIDs          []string
-	userToRoomStates map[string]map[string]State // user id => room id => state
+	Index                  int
+	source                 rand.Source
+	opsPerTick             int
+	userIDs                []string
+	roomIDs                []string
+	userToRoomStates       map[string]map[string]State // user id => room id => state
+	sendToleaveProbability int                         // 0-100 chance of leaving instead of sending a message
 }
 
-func NewStateMachine(seed int64, opsPerTick int, userIDs []string, roomIDs []string) *StateMachine {
+func NewStateMachine(seed int64, opsPerTick, sendToleaveProbability int, userIDs []string, roomIDs []string) *StateMachine {
 	userToRoomStates := make(map[string]map[string]State)
 	for _, u := range userIDs {
 		userToRoomStates[u] = make(map[string]State)
@@ -31,16 +32,20 @@ func NewStateMachine(seed int64, opsPerTick int, userIDs []string, roomIDs []str
 			userToRoomStates[u][r] = StateStart
 		}
 	}
+	if sendToleaveProbability < 0 || sendToleaveProbability > 100 {
+		panic("sendToleaveProbability must be between 0-100")
+	}
 
 	// ensure we get deterministic execution orders, we'll index into these arrays
 	slices.Sort(userIDs)
 	slices.Sort(roomIDs)
 	return &StateMachine{
-		source:           rand.NewSource(seed),
-		opsPerTick:       opsPerTick,
-		userToRoomStates: userToRoomStates,
-		userIDs:          userIDs,
-		roomIDs:          roomIDs,
+		source:                 rand.NewSource(seed),
+		opsPerTick:             opsPerTick,
+		userToRoomStates:       userToRoomStates,
+		userIDs:                userIDs,
+		roomIDs:                roomIDs,
+		sendToleaveProbability: sendToleaveProbability,
 	}
 }
 
@@ -72,8 +77,8 @@ func (s *StateMachine) Tick() []WorkerCommand {
 		case StateJoined:
 			fallthrough
 		case StateSend:
-			// either send a message or leave. We leave at 10% probability
-			shouldLeave := s.random(100)%10 == 0
+			// either send a message or leave. We leave at sendToleaveProbability
+			shouldLeave := s.random(100) < s.sendToleaveProbability
 			if shouldLeave {
 				cmds = append(cmds, WorkerCommand{
 					Action: ActionLeave,
