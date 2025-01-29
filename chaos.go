@@ -96,6 +96,7 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 
 	// process requests to netsplit or restart servers.
 	// doesn't control _when_ this happens, that's the caller's responsibility.
+	started := atomic.Bool{}
 	go func() {
 		for req := range wsServer.ClientRequests() {
 			if req.Netsplit != nil {
@@ -124,29 +125,32 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 					}
 				}
 			}
+			if req.Begin && started.CompareAndSwap(false, true) {
+				go func() {
+					m.Start(func(tickIteration int) {
+						doSnapshot(snapshotters, sdb)
+						if cfg.Test.Convergence.Enabled && tickIteration%cfg.Test.Convergence.CheckEveryNTicks == 0 {
+							// TODO: stop the netsplit goroutine from spliting during this process.
+							wsServer.Send(&ws.PayloadConvergence{
+								State: "starting",
+							})
+							if err := m.CheckConverged(time.Duration(cfg.Test.Convergence.BufferDurationSecs) * time.Second); err != nil {
+								wsServer.Send(&ws.PayloadConvergence{
+									State: "failure",
+									Error: err.Error(),
+								})
+								return
+							}
+							wsServer.Send(&ws.PayloadConvergence{
+								State: "success",
+							})
+						}
+					})
+				}()
+			}
 		}
 	}()
-
-	m.Start(func(tickIteration int) {
-		doSnapshot(snapshotters, sdb)
-		if cfg.Test.Convergence.Enabled && tickIteration%cfg.Test.Convergence.CheckEveryNTicks == 0 {
-			// TODO: stop the netsplit goroutine from spliting during this process.
-			wsServer.Send(&ws.PayloadConvergence{
-				State: "starting",
-			})
-			if err := m.CheckConverged(time.Duration(cfg.Test.Convergence.BufferDurationSecs) * time.Second); err != nil {
-				wsServer.Send(&ws.PayloadConvergence{
-					State: "failure",
-					Error: err.Error(),
-				})
-				return
-			}
-			wsServer.Send(&ws.PayloadConvergence{
-				State: "success",
-			})
-		}
-	})
-	return nil // unreachable
+	return nil
 }
 
 func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain string, shouldBlock func() bool) error {
@@ -262,13 +266,15 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 		}()
 	}
 
+	actionPayload := ws.PayloadWorkerAction{}
+	configPayload := ws.PayloadConfig{}
 	for {
 		var wsMessage ws.WSMessage
 		if err := c.ReadJSON(&wsMessage); err != nil {
 			log.Fatalf("WS ReadJSON: %s", err)
 		}
-		action := ws.PayloadWorkerAction{}
-		if wsMessage.Type == action.Type() && !verbose {
+
+		if wsMessage.Type == actionPayload.Type() && !verbose {
 			continue
 		}
 		payload, err := wsMessage.DecodePayload()
@@ -276,6 +282,12 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 			log.Fatalf("WS DecodePayload: %s with payload %s", err, string(wsMessage.Payload))
 		}
 		log.Println("> " + payload.String())
+		// we start after we have been echoed back the config
+		if payload.Type() == configPayload.Type() {
+			c.WriteJSON(ws.RequestPayload{
+				Begin: true,
+			})
+		}
 	}
 }
 

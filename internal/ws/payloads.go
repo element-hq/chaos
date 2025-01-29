@@ -162,4 +162,5 @@ type PayloadSnapshot struct {
 type RequestPayload struct {
 	RestartServers []string
 	Netsplit       *bool // TODO specify links
+	Begin          bool  // start testing
 }

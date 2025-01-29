@@ -29,10 +29,11 @@ func main() {
 		}()
 	}
 
-	go chaos.Orchestrate(cfg.WSPort, cfg.Verbose, cfg.Test)
-
 	wsServer := ws.NewServer(cfg)
 	if err := chaos.Bootstrap(cfg, wsServer); err != nil {
 		log.Fatalf("Bootstrap: %s", err)
 	}
+
+	// blocks forever
+	chaos.Orchestrate(cfg.WSPort, cfg.Verbose, cfg.Test)
 }
