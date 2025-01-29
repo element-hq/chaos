@@ -112,13 +112,12 @@ func (w *PayloadTickGeneration) Type() string {
 }
 
 type PayloadNetsplit struct {
-	Started      bool
-	DurationSecs int
+	Started bool
 }
 
 func (w *PayloadNetsplit) String() string {
 	if w.Started {
-		return fmt.Sprintf("========== NETSPLIT! (%d seconds) =========", w.DurationSecs)
+		return "========== NETSPLIT! ========="
 	}
 	return "========== NETSPLIT RESOLVED! ========="
 }
@@ -158,4 +157,9 @@ func (w *PayloadRestart) Type() string {
 
 type PayloadSnapshot struct {
 	// TODO
+}
+
+type RequestPayload struct {
+	RestartServers []string
+	Netsplit       *bool // TODO specify links
 }

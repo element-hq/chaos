@@ -46,7 +46,9 @@ test:
     free_secs: 10
   restarts:
     # How often to restart servers
-    interval_secs: 25
+    interval_secs: 20
+    # which servers to restart
+    round_robin: ["hs2"]
   convergence:
     # Enable convergence checks.
     enabled: true

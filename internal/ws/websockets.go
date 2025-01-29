@@ -15,6 +15,7 @@ import (
 type Server struct {
 	upgrader websocket.Upgrader
 	ch       chan Payload
+	reqChan  chan RequestPayload
 	cfg      *config.Chaos
 
 	mu      *sync.Mutex
@@ -26,6 +27,7 @@ func NewServer(cfg *config.Chaos) *Server {
 	return &Server{
 		upgrader: websocket.Upgrader{}, // use default options
 		ch:       make(chan Payload, 100),
+		reqChan:  make(chan RequestPayload, 100),
 		mu:       &sync.Mutex{},
 		conns:    make(map[int]*websocket.Conn),
 		cfg:      cfg,
@@ -105,6 +107,24 @@ func (s *Server) removeConn(id int) {
 	delete(s.conns, id)
 }
 
+func (s *Server) ClientRequests() <-chan RequestPayload {
+	return s.reqChan
+}
+
+func (s *Server) readRequests(conn *websocket.Conn) {
+	for {
+		var wsReq RequestPayload
+		err := conn.ReadJSON(&wsReq)
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("Server.readRequests: %v", err)
+			}
+			break
+		}
+		s.reqChan <- wsReq
+	}
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("incoming WS connection from %v", r.RemoteAddr)
 	c, err := s.upgrader.Upgrade(w, r, nil)
@@ -113,6 +133,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := s.addConn(c)
+	go s.readRequests(c)
 	s.sendDirect(&PayloadConfig{
 		Config: *s.cfg,
 	}, id)

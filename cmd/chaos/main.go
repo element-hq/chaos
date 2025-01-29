@@ -8,6 +8,7 @@ import (
 
 	"github.com/element-hq/chaos"
 	"github.com/element-hq/chaos/config"
+	"github.com/element-hq/chaos/internal/ws"
 )
 
 func main() {
@@ -19,9 +20,6 @@ func main() {
 		log.Fatalf("Error opening config: %s", err)
 	}
 
-	// print WS traffic
-	go chaos.PrintTraffic(cfg.WSPort, cfg.Verbose)
-
 	timeoutSecs := *flagTimeoutSecs
 	if timeoutSecs > 0 {
 		log.Printf("Terminating in %ds\n", timeoutSecs)
@@ -31,7 +29,10 @@ func main() {
 		}()
 	}
 
-	if err := chaos.Bootstrap(cfg); err != nil {
+	go chaos.Orchestrate(cfg.WSPort, cfg.Verbose, cfg.Test)
+
+	wsServer := ws.NewServer(cfg)
+	if err := chaos.Bootstrap(cfg, wsServer); err != nil {
 		log.Fatalf("Bootstrap: %s", err)
 	}
 }

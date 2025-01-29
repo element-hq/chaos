@@ -54,6 +54,8 @@ test:
   restarts:
     # How often to restart servers
     interval_secs: 60
+    # which servers to restart
+    round_robin: ["hs1","hs2"]
   convergence:
     # Enable convergence checks.
     enabled: true

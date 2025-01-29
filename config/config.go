@@ -30,7 +30,8 @@ type TestConfig struct {
 		FreeSecs     int `yaml:"free_secs"`
 	} `yaml:"netsplits"`
 	Restarts struct {
-		IntervalSecs int `yaml:"interval_secs"`
+		IntervalSecs int      `yaml:"interval_secs"`
+		RoundRobin   []string `yaml:"round_robin"`
 	} `yaml:"restarts"`
 	Convergence struct {
 		Enabled            bool `yaml:"enabled"`

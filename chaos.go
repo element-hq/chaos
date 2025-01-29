@@ -45,7 +45,7 @@ func RegisterRestarter(restartType string, restarterCreateFn CreateRestarter) {
 }
 
 // Bootstrap is the entry point for running Chaos.
-func Bootstrap(cfg *config.Chaos) error {
+func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 	var snapshotters []snapshot.Snapshotter
 	var restarters []restart.Restarter
 	for _, hs := range cfg.Homeservers {
@@ -78,7 +78,6 @@ func Bootstrap(cfg *config.Chaos) error {
 		log.Fatalf("snapshot.NewStorage: %s", err)
 	}
 	doSnapshot(snapshotters, sdb)
-	wsServer := ws.NewServer(cfg)
 
 	var shouldBlockFederation atomic.Bool
 	if err := setupFederationInterception(wsServer, cfg.MITMProxy.ContainerURL, cfg.MITMProxy.HostDomain, func() bool {
@@ -95,42 +94,38 @@ func Bootstrap(cfg *config.Chaos) error {
 	}
 	m.StartWorkers(cfg.Test.NumUsers, cfg.Test.OpsPerTick)
 
+	// process requests to netsplit or restart servers.
+	// doesn't control _when_ this happens, that's the caller's responsibility.
 	go func() {
-		for {
-			wsServer.Send(&ws.PayloadNetsplit{
-				Started: false,
-			})
-			shouldBlockFederation.Store(false)
-			time.Sleep(time.Duration(cfg.Test.Netsplits.FreeSecs) * time.Second)
-			shouldBlockFederation.Store(true)
-			wsServer.Send(&ws.PayloadNetsplit{
-				Started:      true,
-				DurationSecs: cfg.Test.Netsplits.DurationSecs,
-			})
-			time.Sleep(time.Duration(cfg.Test.Netsplits.DurationSecs) * time.Second)
+		for req := range wsServer.ClientRequests() {
+			if req.Netsplit != nil {
+				new := *req.Netsplit
+				old := shouldBlockFederation.Swap(new)
+				if old != new {
+					// broadcast a netsplit state change
+					wsServer.Send(&ws.PayloadNetsplit{
+						Started: new,
+					})
+				}
+			}
+			for _, server := range req.RestartServers {
+				for _, r := range restarters {
+					domain := r.Config().Domain
+					if domain == server {
+						wsServer.Send(&ws.PayloadRestart{
+							Domain:   domain,
+							Finished: false,
+						})
+						r.Restart()
+						wsServer.Send(&ws.PayloadRestart{
+							Domain:   domain,
+							Finished: true,
+						})
+					}
+				}
+			}
 		}
 	}()
-
-	if cfg.Test.Restarts.IntervalSecs > 0 && len(restarters) > 0 {
-		log.Printf("Tests with restarts every %d seconds\n", cfg.Test.Restarts.IntervalSecs)
-		go func() {
-			i := 0
-			for {
-				time.Sleep(time.Duration(cfg.Test.Restarts.IntervalSecs) * time.Second)
-				r := restarters[i%len(restarters)]
-				wsServer.Send(&ws.PayloadRestart{
-					Domain:   r.Config().Domain,
-					Finished: false,
-				})
-				r.Restart()
-				wsServer.Send(&ws.PayloadRestart{
-					Domain:   r.Config().Domain,
-					Finished: true,
-				})
-				i++
-			}
-		}()
-	}
 
 	m.Start(func(tickIteration int) {
 		doSnapshot(snapshotters, sdb)
@@ -216,7 +211,9 @@ func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain s
 	return nil
 }
 
-func PrintTraffic(wsPort int, verbose bool) {
+// Orchestrate connects to the WS server and orchestrates netsplit/restart requests based on the provided test config.
+// If not test config is provided, no requests are made.
+func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 	addr := fmt.Sprintf("ws://localhost:%d", wsPort)
 	log.Printf("Dialling %s\n", addr)
 	var c *websocket.Conn
@@ -232,6 +229,37 @@ func PrintTraffic(wsPort int, verbose bool) {
 		if time.Since(now) > time.Second {
 			log.Fatal("cannot connect to WS server")
 		}
+	}
+
+	// orchestrate netsplits/restarts
+	if testConfig.Netsplits.DurationSecs > 0 {
+		yes := true
+		no := false
+		go func() {
+			for {
+				time.Sleep(time.Duration(testConfig.Netsplits.FreeSecs) * time.Second)
+				c.WriteJSON(ws.RequestPayload{
+					Netsplit: &yes,
+				})
+				time.Sleep(time.Duration(testConfig.Netsplits.DurationSecs) * time.Second)
+				c.WriteJSON(ws.RequestPayload{
+					Netsplit: &no,
+				})
+			}
+		}()
+	}
+	if testConfig.Restarts.IntervalSecs > 0 && len(testConfig.Restarts.RoundRobin) > 0 {
+		i := 0
+		go func() {
+			for {
+				nextHS := testConfig.Restarts.RoundRobin[i%len(testConfig.Restarts.RoundRobin)]
+				time.Sleep(time.Duration(testConfig.Restarts.IntervalSecs) * time.Second)
+				c.WriteJSON(ws.RequestPayload{
+					RestartServers: []string{nextHS},
+				})
+				i++
+			}
+		}()
 	}
 
 	for {
