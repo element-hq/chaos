@@ -59,8 +59,9 @@ test:
   convergence:
     # Enable convergence checks.
     enabled: true
-    # Check for convergence at the end of every N ticks.
-    check_every_n_ticks: 10
+    # Check for convergence at the end of the next tick after at least this much time has elapsed
+    # Heals any faults (restarts/netsplits) before checking for convergence.
+    interval_secs: 10
     # After synchronising, how long to wait to flush through any remaining traffic.
     buffer_secs: 3
   # Where to write metrics to.

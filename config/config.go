@@ -35,7 +35,7 @@ type TestConfig struct {
 	} `yaml:"restarts"`
 	Convergence struct {
 		Enabled            bool `yaml:"enabled"`
-		CheckEveryNTicks   int  `yaml:"check_every_n_ticks"`
+		IntervalSecs       int  `yaml:"interval_secs"`
 		BufferDurationSecs int  `yaml:"buffer_secs"`
 	}
 	SnapshotDB string `yaml:"snapshot_db"` // path to sqlite3 file to write snapshot data to

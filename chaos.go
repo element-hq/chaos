@@ -94,43 +94,66 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 	}
 	m.StartWorkers(cfg.Test.NumUsers, cfg.Test.OpsPerTick)
 
-	// process requests to netsplit or restart servers.
+	// process requests to netsplit or restart servers, or check for convergence / start the tests.
 	// doesn't control _when_ this happens, that's the caller's responsibility.
 	started := atomic.Bool{}
+	convergenceRequested := atomic.Bool{}
 	go func() {
 		for req := range wsServer.ClientRequests() {
-			if req.Netsplit != nil {
-				new := *req.Netsplit
-				old := shouldBlockFederation.Swap(new)
-				if old != new {
-					// broadcast a netsplit state change
-					wsServer.Send(&ws.PayloadNetsplit{
-						Started: new,
-					})
-				}
-			}
-			for _, server := range req.RestartServers {
-				for _, r := range restarters {
-					domain := r.Config().Domain
-					if domain == server {
-						wsServer.Send(&ws.PayloadRestart{
-							Domain:   domain,
-							Finished: false,
-						})
-						r.Restart()
-						wsServer.Send(&ws.PayloadRestart{
-							Domain:   domain,
-							Finished: true,
+			// we only want to process fault injection if we aren't asked to check for convergence
+			if !convergenceRequested.Load() {
+				if req.Netsplit != nil {
+					new := *req.Netsplit
+					old := shouldBlockFederation.Swap(new)
+					if old != new {
+						// broadcast a netsplit state change
+						wsServer.Send(&ws.PayloadNetsplit{
+							Started: new,
 						})
 					}
+				}
+				for _, server := range req.RestartServers {
+					for _, r := range restarters {
+						domain := r.Config().Domain
+						if domain == server {
+							wsServer.Send(&ws.PayloadRestart{
+								Domain:   domain,
+								Finished: false,
+							})
+							r.Restart()
+							wsServer.Send(&ws.PayloadRestart{
+								Domain:   domain,
+								Finished: true,
+							})
+						}
+					}
+				}
+			}
+			// To check convergence we cannot be restarting servers or doing netsplits.
+			// If we're in the middle of a restart that's fine as we send sync messages to catch up
+			// which will fail until we are restarted. Netsplits however are a bigger problem as they
+			// are undetectable, so we block all requests to netsplit/restart until we have checked convergence,
+			// and un-netsplit things immediately.
+			if req.CheckConvergence {
+				shouldStartChecks := convergenceRequested.CompareAndSwap(false, true)
+				if shouldStartChecks { // multiple calls to check convergence no-op
+					// heal the netsplit
+					swapped := shouldBlockFederation.CompareAndSwap(true, false)
+					if swapped {
+						// tell the clients
+						wsServer.Send(&ws.PayloadNetsplit{
+							Started: false,
+						})
+					}
+					// we keep convergenceRequested set, so when the tick ends and the Start callback is called, we'll
+					// do a convergence check, and the callback will unset convergenceRequested.
 				}
 			}
 			if req.Begin && started.CompareAndSwap(false, true) {
 				go func() {
 					m.Start(func(tickIteration int) {
 						doSnapshot(snapshotters, sdb)
-						if cfg.Test.Convergence.Enabled && tickIteration%cfg.Test.Convergence.CheckEveryNTicks == 0 {
-							// TODO: stop the netsplit goroutine from spliting during this process.
+						if convergenceRequested.Load() {
 							wsServer.Send(&ws.PayloadConvergence{
 								State: "starting",
 							})
@@ -144,6 +167,7 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 							wsServer.Send(&ws.PayloadConvergence{
 								State: "success",
 							})
+							convergenceRequested.CompareAndSwap(true, false)
 						}
 					})
 				}()
@@ -217,6 +241,7 @@ func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain s
 
 // Orchestrate connects to the WS server and orchestrates netsplit/restart requests based on the provided test config.
 // If not test config is provided, no requests are made.
+// Blocks forever.
 func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 	addr := fmt.Sprintf("ws://localhost:%d", wsPort)
 	log.Printf("Dialling %s\n", addr)
@@ -235,20 +260,30 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 		}
 	}
 
-	// orchestrate netsplits/restarts
+	// setup a single writer so we don't do concurrent writes
+	reqCh := make(chan ws.RequestPayload, 1)
+	go func() {
+		for req := range reqCh {
+			if err := c.WriteJSON(req); err != nil {
+				log.Fatalf("Orchestrate.WriteJSON failed: %s", err)
+			}
+		}
+	}()
+
+	// orchestrate netsplits/restarts/convergence
 	if testConfig.Netsplits.DurationSecs > 0 {
 		yes := true
 		no := false
 		go func() {
 			for {
 				time.Sleep(time.Duration(testConfig.Netsplits.FreeSecs) * time.Second)
-				c.WriteJSON(ws.RequestPayload{
+				reqCh <- ws.RequestPayload{
 					Netsplit: &yes,
-				})
+				}
 				time.Sleep(time.Duration(testConfig.Netsplits.DurationSecs) * time.Second)
-				c.WriteJSON(ws.RequestPayload{
+				reqCh <- ws.RequestPayload{
 					Netsplit: &no,
-				})
+				}
 			}
 		}()
 	}
@@ -258,10 +293,20 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 			for {
 				nextHS := testConfig.Restarts.RoundRobin[i%len(testConfig.Restarts.RoundRobin)]
 				time.Sleep(time.Duration(testConfig.Restarts.IntervalSecs) * time.Second)
-				c.WriteJSON(ws.RequestPayload{
+				reqCh <- ws.RequestPayload{
 					RestartServers: []string{nextHS},
-				})
+				}
 				i++
+			}
+		}()
+	}
+	if testConfig.Convergence.Enabled && testConfig.Convergence.IntervalSecs > 0 {
+		go func() {
+			for {
+				time.Sleep(time.Duration(testConfig.Convergence.IntervalSecs) * time.Second)
+				reqCh <- ws.RequestPayload{
+					CheckConvergence: true,
+				}
 			}
 		}()
 	}
@@ -284,9 +329,9 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 		log.Println("> " + payload.String())
 		// we start after we have been echoed back the config
 		if payload.Type() == configPayload.Type() {
-			c.WriteJSON(ws.RequestPayload{
+			reqCh <- ws.RequestPayload{
 				Begin: true,
-			})
+			}
 		}
 	}
 }

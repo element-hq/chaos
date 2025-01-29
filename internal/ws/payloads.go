@@ -160,7 +160,8 @@ type PayloadSnapshot struct {
 }
 
 type RequestPayload struct {
-	RestartServers []string
-	Netsplit       *bool // TODO specify links
-	Begin          bool  // start testing
+	RestartServers   []string
+	Netsplit         *bool // TODO specify links, this just splits them all, assuming 2x HSes
+	Begin            bool  // start testing
+	CheckConvergence bool
 }

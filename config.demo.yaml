@@ -46,14 +46,14 @@ test:
     free_secs: 10
   restarts:
     # How often to restart servers
-    interval_secs: 20
+    interval_secs: 0
     # which servers to restart
     round_robin: ["hs2"]
   convergence:
     # Enable convergence checks.
     enabled: true
-    # Check for convergence at the end of every N ticks.
-    check_every_n_ticks: 10
+    # Check for convergence at the end of the next tick after at least this much time has elapsed
+    interval_secs: 20
     # After synchronising, how long to wait to flush through any remaining traffic.
     buffer_secs: 3
   # Where to write metrics to.
