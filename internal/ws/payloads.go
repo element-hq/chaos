@@ -67,10 +67,11 @@ type PayloadWorkerAction struct {
 	UserID string
 	RoomID string
 	Action string
+	Body   string
 }
 
 func (w *PayloadWorkerAction) String() string {
-	return fmt.Sprintf("WorkerAction: %s %s %s", w.UserID, w.Action, w.RoomID)
+	return fmt.Sprintf("WorkerAction: %s %s %s %s", w.UserID, w.Action, w.RoomID, w.Body)
 }
 
 func (w *PayloadWorkerAction) Type() string {
@@ -78,11 +79,10 @@ func (w *PayloadWorkerAction) Type() string {
 }
 
 type PayloadFederationRequest struct {
-	Method      string
-	URL         string
-	Origin      string
-	Destination string
-	Blocked     bool
+	Method  string
+	URL     string
+	Body    json.RawMessage
+	Blocked bool
 }
 
 func (w *PayloadFederationRequest) String() string {

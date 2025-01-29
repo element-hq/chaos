@@ -174,6 +174,7 @@ func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain s
 		wsServer.Send(&ws.PayloadFederationRequest{
 			Method:  d.Method,
 			URL:     d.URL,
+			Body:    d.RequestBody,
 			Blocked: block,
 		})
 		if block {

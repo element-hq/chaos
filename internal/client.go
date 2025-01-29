@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -123,12 +122,6 @@ func (c *CSAPI) LeaveRoom(roomID string) error {
 	// leave the room
 	body := map[string]interface{}{}
 	_, err := c.Do("POST", []string{"_matrix", "client", "v3", "rooms", roomID, "leave"}, WithJSONBody(body))
-	return err
-}
-
-func (c *CSAPI) SendMessage(roomID string) error {
-	msg := fmt.Sprintf("%s %s", adjectives[rand.Intn(len(adjectives))], nouns[rand.Intn(len(nouns))])
-	_, err := c.SendMessageWithText(roomID, msg)
 	return err
 }
 

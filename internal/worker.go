@@ -2,7 +2,9 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/element-hq/chaos/internal/ws"
@@ -59,10 +61,15 @@ func (w *Worker) Run() {
 		if user == nil {
 			log.Fatalf("Worker received instruction for unknown user '%s' known users = %d", cmd.UserID, len(w.Users))
 		}
+		var body string
+		if cmd.Action == ActionSend {
+			body = fmt.Sprintf("%s %s", adjectives[rand.Intn(len(adjectives))], nouns[rand.Intn(len(nouns))])
+		}
 		w.wsServer.Send(&ws.PayloadWorkerAction{
 			Action: string(cmd.Action),
 			UserID: cmd.UserID,
 			RoomID: cmd.RoomID,
+			Body:   body,
 		})
 		var err error
 		switch cmd.Action {
@@ -71,7 +78,7 @@ func (w *Worker) Run() {
 		case ActionLeave:
 			err = user.LeaveRoom(cmd.RoomID)
 		case ActionSend:
-			err = user.SendMessage(cmd.RoomID)
+			_, err = user.SendMessageWithText(cmd.RoomID, body)
 		}
 		if err != nil {
 			w.SignalChan <- err
