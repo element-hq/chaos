@@ -1,18 +1,28 @@
-## Chaos
+<div align="center">
+<img src="web/public/chaos-alpha.png" alt="Alt Text" width="100" height="100">
+ <h1>Chaos</h1>
+</div>
 
-Chaos is a partition/fault tolerance testing tool for homeservers. It can deterministically cause netsplits and restart servers, and periodically checks for convergence by ensuring all homeservers see the same member list as every other server.
+![Matrix](https://img.shields.io/matrix/chaos-testing:matrix.org)
+
+
+Chaos is a partition/fault tolerance testing tool for homeservers. It can cause netsplits and restart servers, and periodically checks for convergence by ensuring all homeservers see the same member list as every other server.
 
 ### Quick Start
 ```
+# Node 20+ required
+(cd web && yarn install && yarn build)
 go build ./cmd/chaos
 docker compose up -d
-./chaos -config config.demo.yaml
+./chaos -config config.demo.yaml --web
 ```
 
 To access the databases of the demo servers:
 ```
 $ ./demo/database_repl.sh hs1 # or hs2
 ```
+
+To run in CLI only mode drop `--web`.
 
 ### Running
 
@@ -48,25 +58,24 @@ This uses the same technique that [complement-crypto](https://github.com/matrix-
 uses to intercept CSAPI traffic, but it intercepts _federation traffic_. The same functionality is
 supported to manipulate and block traffic.
 
-We use Go tests to give us the required amount of concurrency (multi-core, async runtimes) vs Python
-or Node which are single core async runtimes.
+We use Go to give us the true parallelism vs Python or Node which are single core async runtimes.
 
-#### Requirements
+#### Design Requirements
 
 - We want concurrent requests to generate load.
 - We want the internal state machine to be simple enough that tests know what the expected end state is.
 - We want to generate state and messages in rooms.
 - We want to exercise state resolution.
 - We want to be able to netsplit servers.
-- We want to be deterministic without sacrificing concurrency.
-- Stretch: We may want to visualise traffic and netsplits.
+- We want to be as deterministic as possible without sacrificing concurrency.
+- We want to visualise traffic and netsplits.
 
 #### Design
 
 - WORKERS: Each user is a goroutine. Each goroutine gets HTTP request instructions, performs it and returns OK or an error.
   * technically we want N worker goroutines, and bucket users by worker, but for the numbers we're talking about (<100 users) 1 worker per user is fine.
   * we want the "Master goroutine" which sends instructions to maintain the confirmed/pending transitions, hence why each goroutine is dumb and doesn't have any internal state themselves.
-  * Setting workers=1 means we have at most 1 in-flight req, and provided we order instructions deterministically, we will get deterministic runs, but sacrifice concurrency to do so.
+  * Setting workers=1 means we have at most 1 in-flight req, and provided we order instructions deterministically, we will get deterministic-ish runs, but sacrifice concurrency to do so.
 - MASTER: A Master goroutine which knows the entire test state. Master prepares the test by creating users/rooms up-front. We don't want to faff with that in our state machine. Master creates instructions:
   * State machine for a user and room:
     ```
@@ -77,10 +86,9 @@ or Node which are single core async runtimes.
                 `---------------------`
     ```
   * Each transition has a probability, and the dice roll is obtained from a PRNG with a fixed seed.
-  * We need to execute users in sequence (e.g sorted by user ID) for determinism.
+  * We need to execute instructions in sequence (e.g sorted by user ID) for determinism.
 - TICKS: To get limited determinism with concurrency, we split instructions into groups called "ticks". Each tick, the Master makes N instructions and concurrently tells workers to execute them. The Master then waits for the responses before proceeding to the next tick. This will create spikey traffic as we wait for the long tail of requests to respond.
-  * At the end of each tick, we perform a "snapshot".
-- SNAPSHOT: Collects pod metrics and whines about any errors. Can also query room state on all servers to ensure state has converged (HS1==HS2==Master)
-- NETSPLITS: Can occur at the start of a tick (same PRNG for users is used). Lasts the duration of the tick (TODO: make configurable?).
-  * In theory this could be done at any point but we want determinism so pin it to the start of a tick.
-  * Netsplits should never cause state transitions to fail, as we are highly available. The only caveat would be if all 1 server's users have left a room, so maybe need a sentinel user (Master user IDs) to be joined to all rooms to just lurk.
+  * At the end of each tick, we can perform a "snapshot" or test for "convergence".
+- SNAPSHOT: Collects metrics about the running servers.
+- CONVERGENCE: Queries room state on all servers to ensure state has converged (HS1==HS2==Master) - that is all servers and Chaos agree on the member list for the room. Requires some synchronisation between servers first as some servers may have lost traffic due to "netsplits".
+- NETSPLITS: Can occur at any time. In CLI mode this is on a timer, in Web mode it's user controlled. Netsplits should never cause state transitions to fail (e.g joining a room), as we are highly available and masters are always joined to the room so the server always has at least 1 user joined.
