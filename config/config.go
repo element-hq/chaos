@@ -25,6 +25,7 @@ type TestConfig struct {
 	OpsPerTick             int    `yaml:"ops_per_tick"`
 	RoomVersion            string `yaml:"room_version"`
 	SendToLeaveProbability int    `yaml:"send_to_leave_probability"`
+	FederationDelayMs      int    `yaml:"federation_delay_ms"`
 	Netsplits              struct {
 		DurationSecs int `yaml:"duration_secs"`
 		FreeSecs     int `yaml:"free_secs"`

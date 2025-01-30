@@ -85,9 +85,12 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 	doSnapshot(snapshotters, sdb)
 
 	var shouldBlockFederation atomic.Bool
-	if err := setupFederationInterception(wsServer, cfg.MITMProxy.ContainerURL, cfg.MITMProxy.HostDomain, func() bool {
-		return shouldBlockFederation.Load()
-	}); err != nil {
+	if err := setupFederationInterception(
+		wsServer, cfg.MITMProxy.ContainerURL, cfg.MITMProxy.HostDomain,
+		time.Duration(cfg.Test.FederationDelayMs)*time.Millisecond,
+		func() bool {
+			return shouldBlockFederation.Load()
+		}); err != nil {
 		log.Fatalf("setupFederationInterception: %s", err)
 	}
 
@@ -182,12 +185,15 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 	return nil
 }
 
-func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain string, shouldBlock func() bool) error {
+func setupFederationInterception(wsServer *ws.Server, mitmProxyURL, hostDomain string, delayMs time.Duration, shouldBlock func() bool) error {
 	cbServer, err := internal.NewCallbackServer(hostDomain)
 	if err != nil {
 		return fmt.Errorf("NewCallbackServer: %s", err)
 	}
 	cbURL := cbServer.SetOnRequestCallback(func(d internal.Data) *internal.Response {
+		if delayMs > 0 {
+			time.Sleep(delayMs)
+		}
 		block := shouldBlock()
 		if block && strings.HasSuffix(d.URL, "/.well-known/matrix/server") {
 			// allow .well-known lookups. This is a bit horrible as it means netsplits aren't

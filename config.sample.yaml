@@ -42,6 +42,8 @@ test:
   num_rooms: 2
   # How many join/sends/leaves to do per tick.
   ops_per_tick: 50
+  # Amount of latency to add before the request reaches the other side. No latency is applied for the response.
+  federation_delay_ms: 100
   # number between 0-100 which is the % chance the user leaves the room instead of sending a message
   # higher numbers cause more membership transitions overall which stresses the server in different ways.
   # if 100, never sends messages.
