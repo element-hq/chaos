@@ -1,0 +1,32 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+#chaos-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+#chaos-img {
+  padding: 16px;
+}
+
+.infobox {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.infobox-label {
+  font-size: small;
+  text-align: center;
+}
