@@ -118,6 +118,16 @@ func (c *CSAPI) JoinRoom(roomIDOrAlias string, serverNames []string) error {
 	return err
 }
 
+// EnsureFullyJoined makes sure that the room is no longer partially joined.
+// The server will block until the room is fully joined
+// so we can use this as a synchronisation primitive when joining rooms initially.
+// Returns no data or error, the side-effect of waiting for the response is what we want.
+func (c *CSAPI) EnsureFullyJoined(roomID string) {
+	c.Do(
+		"GET", []string{"_matrix", "client", "v3", "rooms", roomID, "joined_members"},
+	)
+}
+
 func (c *CSAPI) LeaveRoom(roomID string) error {
 	// leave the room
 	body := map[string]interface{}{}

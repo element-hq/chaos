@@ -82,6 +82,7 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 			if err := masters[i].JoinRoom(roomID, []string{creator.Domain}); err != nil {
 				return fmt.Errorf("%s failed to join room %s : %s", masters[i].UserID, roomID, err)
 			}
+			masters[i].EnsureFullyJoined(roomID)
 		}
 		roomIDs = append(roomIDs, roomID)
 	}
