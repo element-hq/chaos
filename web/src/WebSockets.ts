@@ -1,6 +1,7 @@
 
 
 export type WebSocketMessage = {
+    ID: string
     Type: string
     Payload: Record<string,any>
 }
@@ -40,6 +41,10 @@ export class ChaosWebsocket extends EventTarget {
                 break;
             case "PayloadNetsplit":
                 this.dispatchEvent(new CustomEvent("PayloadNetsplit", {detail: msg.Payload}));
+                break;
+            case "PayloadFederationRequest":
+                msg.Payload.ID = msg.ID;
+                this.dispatchEvent(new CustomEvent("PayloadFederationRequest", {detail: msg.Payload}));
                 break;
         }
     }
@@ -83,4 +88,11 @@ export type PayloadWorkerAction = {
 export type PayloadConfig = {
     WorkerUserIDs: Array<string>, 
     Config: Record<string, any>
+}
+export type PayloadFederationRequest = {
+    ID: string, // msg
+    Method: string,
+    URL: string,
+    Body: Record<string,any>,
+    Blocked: boolean
 }

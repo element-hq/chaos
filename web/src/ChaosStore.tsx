@@ -1,11 +1,16 @@
 import { create } from 'zustand';
 import { type AppNode } from "./Nodes";
-import { ChaosWebsocket, PayloadConfig, PayloadConvergence, PayloadNetsplit, PayloadTickGeneration, PayloadWorkerAction } from './WebSockets';
+import { ChaosWebsocket, PayloadConfig, PayloadConvergence, PayloadFederationRequest, PayloadNetsplit, PayloadTickGeneration, PayloadWorkerAction } from './WebSockets';
 
 export type ChaosStore = {
     convergenceState: string
     isNetsplit: boolean
     started: boolean
+    fedLatencyMs: number
+    inflightFedRequests: Map<string, {
+        payload: PayloadFederationRequest,
+        start: number,
+    }>
 
     // for now this is domain => client so we only support 1 client TODO allow multiple
     clients: Record<string, {
@@ -21,6 +26,7 @@ export type ChaosStore = {
     onTickGeneration: (payload: PayloadTickGeneration) => void
     onConvergenceUpdate: (payload: PayloadConvergence) => void
     onNetsplit: (payload: PayloadNetsplit) => void
+    onFederationRequest: (payload: PayloadFederationRequest) => void
 
 
     connect: (wsAddr: string) => void
@@ -43,7 +49,9 @@ export const useStore = create<ChaosStore>()((set, get) => ({
     isNetsplit: false,
     connectedToRemoteServer: false,
     tickNumber: 0,
+    fedLatencyMs: 0,
     clients: {},
+    inflightFedRequests: new Map(),
 
     // Server-received actions (mapped from WS payloads)
     // -------------------------------------------------
@@ -52,6 +60,11 @@ export const useStore = create<ChaosStore>()((set, get) => ({
         if (payload.Config.Test.NumUsers !== 2 || payload.Config.Homeservers.length !== 2) {
             console.error("Incompatible Chaos configuration, only 2 HS with 1 user each is supported currently.");
             console.error("Configuration received:", payload.Config);
+        }
+        if (payload.Config.Test.FederationDelayMs) {
+            set({
+                fedLatencyMs: payload.Config.Test.FederationDelayMs,
+            });
         }
         const clients: Record<string, {
             userId: string,
@@ -101,6 +114,28 @@ export const useStore = create<ChaosStore>()((set, get) => ({
             isNetsplit: payload.Started,
         });
     },
+    onFederationRequest: (payload: PayloadFederationRequest) => {
+        useStore.setState((prev) => {
+            console.log(payload.ID, payload.URL, "existing: ", prev.inflightFedRequests.size);
+            const copy = new Map(prev.inflightFedRequests);
+            copy.set(payload.ID, {
+                payload: payload,
+                start: Date.now(),
+            });
+            setTimeout(() => {
+                useStore.setState((prev) => {
+                    const copy = new Map(prev.inflightFedRequests);
+                    copy.delete(payload.ID);
+                    return {
+                        inflightFedRequests: copy,
+                    };
+                })
+            }, prev.fedLatencyMs);
+            return {
+                inflightFedRequests: copy,
+            };
+        });
+    },
 
 
 
@@ -126,6 +161,9 @@ export const useStore = create<ChaosStore>()((set, get) => ({
         });
         ws.addEventListener("PayloadNetsplit", (ev: unknown) => {
             get().onNetsplit((ev as CustomEvent).detail);
+        });
+        ws.addEventListener("PayloadFederationRequest", (ev: unknown) => {
+            get().onFederationRequest((ev as CustomEvent).detail);
         });
         await ws.connect(wsAddr);
     },

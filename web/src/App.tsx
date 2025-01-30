@@ -12,7 +12,7 @@ import {
 } from '@xyflow/react';
 
 import '@xyflow/react/dist/style.css';
-import { AnimatedSVGEdge, ClientServerEdgeLabel } from './Edges';
+import { FederationEdge, ClientServerEdgeLabel } from './Edges';
 import type { NodeTypes } from '@xyflow/react';
 import { AppNode, ClientNode, HomeserverNode } from './Nodes';
 import { ChaosPanel } from './ChaosPanel';
@@ -24,7 +24,7 @@ const nodeTypes = {
 
 
 // Define nodes and edges
-export type AppEdge = AnimatedSVGEdge | Edge;
+export type AppEdge = FederationEdge | Edge;
 
 const initialNodes: AppNode[] = [
   {
@@ -45,13 +45,14 @@ const initialNodes: AppNode[] = [
   { id: "client2", type: "client-node", position: { x: 200, y: -100 }, data: { domain: "hs2" } },
 ];
 const initialEdges: AppEdge[] = [
-  { id: 'hs1hs2', source: 'hs1', target: 'hs2', targetHandle: "federation", animated: false, label: "foo", type: "animatedSvg", data: { duration: "1s" } },
+  { id: 'hs1hs2', source: 'hs1', target: 'hs2', sourceHandle: "federationR", targetHandle: "federationL", label: "hs1", type: "federation", data: { domain: "hs1" } },
+  { id: 'hs2hs1', source: 'hs2', target: 'hs1', sourceHandle: "federationL", targetHandle: "federationR", label: "hs2", type: "federation", data: { domain: "hs2" } },
   { id: "hs1-client1", source: "client1", target: "hs1", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs1" /> },
   { id: "hs2-client1", source: "client2", target: "hs2", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs2" /> },
 ];
 
 const edgeTypes = {
-  animatedSvg: AnimatedSVGEdge
+  federation: FederationEdge
 } satisfies EdgeTypes;
 
 // Run  the app

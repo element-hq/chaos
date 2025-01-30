@@ -52,8 +52,10 @@ export function HomeserverNode({
             </div>
 
             <Handle type="target" id="client" position={Position.Top} />
-            <Handle type="target" id="federation" position={Position.Left} />
-            <Handle type="source" position={Position.Right} />
+            <Handle type="target" id="federationL" position={Position.Left} />
+            <Handle type="target" id="federationR" position={Position.Right} />
+            <Handle type="source" id="federationL" position={Position.Left} />
+            <Handle type="source" id="federationR" position={Position.Right} />
         </div>
     );
 }
