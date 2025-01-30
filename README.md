@@ -5,6 +5,7 @@
 
 [![Matrix](https://img.shields.io/matrix/chaos-testing:matrix.org)](https://matrix.to/#/#chaos-testing:matrix.org)
 [![GitHub License](https://img.shields.io/github/license/element-hq/chaos)](/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/element-hq/chaos)](https://goreportcard.com/report/github.com/element-hq/chaos)
 
 
 Chaos is a partition/fault tolerance testing tool for homeservers. It can cause netsplits and restart servers, and periodically checks for convergence by ensuring all homeservers see the same member list as every other server.
