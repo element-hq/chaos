@@ -3,7 +3,7 @@
  <h1>Chaos</h1>
 </div>
 
-![Matrix](https://img.shields.io/matrix/chaos-testing:matrix.org)
+[![Matrix](https://img.shields.io/matrix/chaos-testing:matrix.org)](https://matrix.to/#/#chaos-testing:matrix.org)
 
 
 Chaos is a partition/fault tolerance testing tool for homeservers. It can cause netsplits and restart servers, and periodically checks for convergence by ensuring all homeservers see the same member list as every other server.
