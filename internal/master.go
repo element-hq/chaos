@@ -105,7 +105,8 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	return nil
 }
 
-func (m *Master) StartWorkers(numWorkers, opsPerTick int) {
+// StartWorkers starts the requested number of workers, returning their user IDs
+func (m *Master) StartWorkers(numWorkers, opsPerTick int) []string {
 	if numWorkers > len(m.users) {
 		log.Printf("Requested %d workers but only %d users exist, setting workers to %d", numWorkers, len(m.users), len(m.users))
 		numWorkers = len(m.users)
@@ -114,6 +115,7 @@ func (m *Master) StartWorkers(numWorkers, opsPerTick int) {
 	if numWorkers < len(m.users) {
 		panic("not implemented")
 	}
+	var result []string
 	for i := 0; i < numWorkers; i++ {
 		users := []CSAPI{m.users[i]}
 		// if the tick randomly makes work all for one worker we want to be able to queue it all up without blocking + EOF signal
@@ -123,6 +125,7 @@ func (m *Master) StartWorkers(numWorkers, opsPerTick int) {
 		w := NewWorker(users, m.wsServer, workerCh, errCh)
 		for _, u := range users {
 			m.userIDToWorker[u.UserID] = w
+			result = append(result, u.UserID)
 		}
 		m.workers = append(m.workers, w)
 		go w.Run()
@@ -131,6 +134,7 @@ func (m *Master) StartWorkers(numWorkers, opsPerTick int) {
 	if len(m.userIDToWorker) != len(m.users) {
 		log.Fatalf("not all users have workers: %d != %d", len(m.userIDToWorker), len(m.users))
 	}
+	return result
 }
 
 func (m *Master) Start(postTickFn func(tickIteration int)) {

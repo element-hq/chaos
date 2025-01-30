@@ -1,7 +1,9 @@
 package chaos
 
 import (
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
@@ -19,6 +21,9 @@ import (
 	"github.com/element-hq/chaos/snapshot"
 	"github.com/gorilla/websocket"
 )
+
+//go:embed web/dist
+var web embed.FS
 
 type CreateSnapshotter func(hsc config.HomeserverConfig) (snapshot.Snapshotter, error)
 type CreateRestarter func(hsc config.HomeserverConfig) (restart.Restarter, error)
@@ -86,13 +91,13 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 		log.Fatalf("setupFederationInterception: %s", err)
 	}
 
-	go wsServer.Start(fmt.Sprintf("0.0.0.0:%d", cfg.WSPort))
-
 	m := internal.NewMaster(wsServer)
 	if err := m.Prepare(cfg); err != nil {
 		log.Fatalf("Prepare: %s", err)
 	}
-	m.StartWorkers(cfg.Test.NumUsers, cfg.Test.OpsPerTick)
+	workerUserIDs := m.StartWorkers(cfg.Test.NumUsers, cfg.Test.OpsPerTick)
+	wsServer.SetWorkers(workerUserIDs) // let clients know the users we provisioned TODO find a nicer API shape e.g also include netsplits
+	go wsServer.Start(fmt.Sprintf("0.0.0.0:%d", cfg.WSPort))
 
 	// process requests to netsplit or restart servers, or check for convergence / start the tests.
 	// doesn't control _when_ this happens, that's the caller's responsibility.
@@ -334,6 +339,18 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 			}
 		}
 	}
+}
+
+// Run an HTTP server with an interactive UI. Blocks forever
+func Web(port int) {
+	webFS, err := fs.Sub(web, "web/dist")
+	if err != nil {
+		log.Fatalf("failed to load web files: %s", err)
+	}
+	http.Handle("/", http.FileServer(http.FS(webFS)))
+	log.Printf("Web UI running on http://localhost:%d", port)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), http.DefaultServeMux)
+	fmt.Println(err)
 }
 
 func doSnapshot(snapshotters []snapshot.Snapshotter, sdb *snapshot.Storage) {

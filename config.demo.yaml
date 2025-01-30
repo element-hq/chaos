@@ -7,7 +7,7 @@ mitm_proxy:
   # Native linux uses 'host-gateway'
   host_domain: "host.docker.internal"
 # The port to listen on for websocket traffic.
-ws_port: 7406
+ws_port: 7405
 # Enable moar logging
 verbose: false
 homeservers:
@@ -28,9 +28,9 @@ test:
   # PRNG seed
   seed: 42
   # Number of users to create. This is round-robined on the number of servers.
-  num_users: 8
+  num_users: 2
   # Number of rooms to create. The creator is round-robined on the number of servers.
-  num_rooms: 2
+  num_rooms: 1
   # The room version to test against. If empty, uses the default room version for the HS.
   # room_version: "11"
   # number between 0-100 which is the % chance the user leaves the room instead of sending a message

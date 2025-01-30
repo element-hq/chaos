@@ -13,10 +13,11 @@ import (
 )
 
 type Server struct {
-	upgrader websocket.Upgrader
-	ch       chan Payload
-	reqChan  chan RequestPayload
-	cfg      *config.Chaos
+	upgrader      websocket.Upgrader
+	ch            chan Payload
+	reqChan       chan RequestPayload
+	cfg           *config.Chaos
+	workerUserIDs []string
 
 	mu      *sync.Mutex
 	conns   map[int]*websocket.Conn
@@ -25,13 +26,21 @@ type Server struct {
 
 func NewServer(cfg *config.Chaos) *Server {
 	return &Server{
-		upgrader: websocket.Upgrader{}, // use default options
-		ch:       make(chan Payload, 100),
-		reqChan:  make(chan RequestPayload, 100),
-		mu:       &sync.Mutex{},
-		conns:    make(map[int]*websocket.Conn),
-		cfg:      cfg,
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		}, // use default options
+		ch:      make(chan Payload, 100),
+		reqChan: make(chan RequestPayload, 100),
+		mu:      &sync.Mutex{},
+		conns:   make(map[int]*websocket.Conn),
+		cfg:     cfg,
 	}
+}
+
+func (s *Server) SetWorkers(workerUserIDs []string) {
+	s.workerUserIDs = workerUserIDs
 }
 
 func (s *Server) Send(payload WSPayload) {
@@ -135,7 +144,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id := s.addConn(c)
 	go s.readRequests(c)
 	s.sendDirect(&PayloadConfig{
-		Config: *s.cfg,
+		Config:        *s.cfg,
+		WorkerUserIDs: s.workerUserIDs,
 	}, id)
 	c.SetCloseHandler(func(code int, text string) error {
 		s.removeConn(id)

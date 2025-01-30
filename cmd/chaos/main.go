@@ -13,6 +13,8 @@ import (
 
 func main() {
 	flagConfig := flag.String("config", "", "path to the config YAML")
+	flagWeb := flag.Bool("web", false, "Enable the web UI and don't automate actions")
+	flagWebPort := flag.Int("web-port", 3405, "Listen on this port")
 	flagTimeoutSecs := flag.Int("timeout_secs", 0, "number of seconds to run chaos")
 	flag.Parse()
 	cfg, err := config.OpenFile(*flagConfig)
@@ -35,5 +37,11 @@ func main() {
 	}
 
 	// blocks forever
-	chaos.Orchestrate(cfg.WSPort, cfg.Verbose, cfg.Test)
+	if *flagWeb {
+		// spin up an HTTP server which will start Chaos / issue faults
+		chaos.Web(*flagWebPort)
+	} else {
+		// use the provided test yaml to automate fault injection
+		chaos.Orchestrate(cfg.WSPort, cfg.Verbose, cfg.Test)
+	}
 }

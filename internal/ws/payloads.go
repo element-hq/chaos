@@ -51,7 +51,8 @@ func (w *WSMessage) DecodePayload() (WSPayload, error) {
 }
 
 type PayloadConfig struct {
-	Config config.Chaos
+	Config        config.Chaos
+	WorkerUserIDs []string
 }
 
 func (w *PayloadConfig) String() string {
