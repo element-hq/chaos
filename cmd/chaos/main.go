@@ -2,14 +2,34 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/element-hq/chaos"
 	"github.com/element-hq/chaos/config"
 	"github.com/element-hq/chaos/internal/ws"
 )
+
+func open(url string) error {
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+	default: // "linux", "freebsd", "openbsd", "netbsd"
+		cmd = "xdg-open"
+	}
+	args = append(args, url)
+	return exec.Command(cmd, args...).Start()
+}
 
 func main() {
 	flagConfig := flag.String("config", "", "path to the config YAML")
@@ -38,6 +58,10 @@ func main() {
 
 	// blocks forever
 	if *flagWeb {
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			open(fmt.Sprintf("http://localhost:%d", *flagWebPort))
+		}()
 		// spin up an HTTP server which will start Chaos / issue faults
 		chaos.Web(*flagWebPort)
 	} else {

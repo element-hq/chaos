@@ -354,16 +354,6 @@ func (c *CSAPI) Do(method string, paths []string, opts ...RequestOpt) (*http.Res
 	if res == nil {
 		return nil, fmt.Errorf("CSAPI.Do response returned error: %s", err)
 	}
-	// debug log the response
-	if c.Debug && res != nil {
-		/*
-			var dump []byte
-			dump, err = httputil.DumpResponse(res, true)
-			if err != nil {
-				return nil, fmt.Errorf("CSAPI.Do failed to dump response body: %s", err)
-			}
-			log.Printf("%s", string(dump)) */
-	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		defer res.Body.Close()
 		body, _ := io.ReadAll(res.Body)
