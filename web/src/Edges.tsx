@@ -33,7 +33,7 @@ export function FederationEdge({
     const fedLatencyMs = useStore((state) => state.fedLatencyMs);
     const [startedAnimations, setStartedAnimations] = useState(new Set<string>());
 
-    const animRefs = useRef({} as Record<string, SVGElement>);
+    const animRefs = useRef({} as Record<string, SVGAnimateMotionElement>);
     const duration = fedLatencyMs + "ms";
     const flightBubbles = [];
     const inflightReqs = useStore((state) => state.inflightFedRequests);
@@ -61,7 +61,7 @@ export function FederationEdge({
             <svg key={id} x={req.payload.Blocked ? sourceX : undefined} y={req.payload.Blocked ? sourceY : undefined}>
                 <circle r="10" fill={colour}>
                     {!req.payload.Blocked && <animateMotion ref={(el) => {
-                        animRefs.current[id] = el!;
+                        animRefs.current[id] = el! as SVGAnimateElement;
                     }} dur={duration} repeatCount="1" fill="freeze" path={edgePath} />}
                 </circle>
             </svg>
