@@ -28,21 +28,21 @@ export type AppEdge = FederationEdge | Edge;
 
 const initialNodes: AppNode[] = [
   {
-    id: 'hs1', type: 'homeserver-node', position: { x: -200, y: 100 },
+    id: 'hs1', type: 'homeserver-node', position: { x: -300, y: 100 },
     data: {
-      label: 'hs1',
       isRestarting: false,
+      domain: "hs1",
     }
   },
   {
-    id: 'hs2', type: 'homeserver-node', position: { x: 200, y: 100 },
+    id: 'hs2', type: 'homeserver-node', position: { x: 300, y: 100 },
     data: {
-      label: 'hs2',
       isRestarting: false,
+      domain: "hs2",
     }
   },
-  { id: "client1", type: "client-node", position: { x: -200, y: -100 }, data: { domain: "hs1" } },
-  { id: "client2", type: "client-node", position: { x: 200, y: -100 }, data: { domain: "hs2" } },
+  { id: "client1", type: "client-node", position: { x: -300, y: -100 }, data: { domain: "hs1" } },
+  { id: "client2", type: "client-node", position: { x: 300, y: -100 }, data: { domain: "hs2" } },
 ];
 const initialEdges: AppEdge[] = [
   { id: 'hs1hs2', source: 'hs1', target: 'hs2', sourceHandle: "federationR", targetHandle: "federationL", label: "hs1", type: "federation", data: { domain: "hs1" } },

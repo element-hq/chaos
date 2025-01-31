@@ -31,7 +31,7 @@ test:
   num_users: 2
   # Number of rooms to create. The creator is round-robined on the number of servers.
   num_rooms: 1
-  federation_delay_ms: 200
+  federation_delay_ms: 400
   # The room version to test against. If empty, uses the default room version for the HS.
   # room_version: "11"
   # number between 0-100 which is the % chance the user leaves the room instead of sending a message

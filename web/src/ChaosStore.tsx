@@ -49,7 +49,7 @@ export const useStore = create<ChaosStore>()((set, get) => ({
     isNetsplit: false,
     connectedToRemoteServer: false,
     tickNumber: 0,
-    fedLatencyMs: 0,
+    fedLatencyMs: 1000,
     clients: {},
     inflightFedRequests: new Map(),
 

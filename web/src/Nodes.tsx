@@ -34,29 +34,32 @@ export function ClientNode({
 export type HomeserverNode = Node<HomeserverNodeData, 'homeserver-node'>;
 
 export type HomeserverNodeData = {
-    label: string,
     isRestarting: boolean,
+    domain: string,
 };
 
 export function HomeserverNode({
     data,
 }: NodeProps<HomeserverNode>) {
     const d = data as HomeserverNodeData;
+
     return (
         // We add this class to use the same styles as React Flow's default nodes.
-        <div className="react-flow__node-default">
-            {data.label && <div>{data.label}</div>}
+        <>
+            <div className="react-flow__node-default">
+                {data.domain && <div>{data.domain}</div>}
 
-            <div>
-                <input type="button" value={d.isRestarting ? "Restarting" : "Restart"} disabled={d.isRestarting} />
+                <div>
+                    <input type="button" value={d.isRestarting ? "Restarting" : "Restart"} disabled={d.isRestarting} />
+                </div>
+
+                <Handle type="target" id="client" position={Position.Top} />
+                <Handle type="target" id="federationL" position={Position.Left} />
+                <Handle type="target" id="federationR" position={Position.Right} />
+                <Handle type="source" id="federationL" position={Position.Left} />
+                <Handle type="source" id="federationR" position={Position.Right} />
             </div>
-
-            <Handle type="target" id="client" position={Position.Top} />
-            <Handle type="target" id="federationL" position={Position.Left} />
-            <Handle type="target" id="federationR" position={Position.Right} />
-            <Handle type="source" id="federationL" position={Position.Left} />
-            <Handle type="source" id="federationR" position={Position.Right} />
-        </div>
+        </>
     );
 }
 
