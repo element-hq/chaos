@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { type AppNode } from "./Nodes";
 import { ChaosWebsocket, PayloadConfig, PayloadConvergence, PayloadFederationRequest, PayloadNetsplit, PayloadRestart, PayloadTickGeneration, PayloadWorkerAction } from './WebSockets';
+import { addEdge, applyEdgeChanges, applyNodeChanges, Connection, Edge, EdgeChange, NodeChange } from '@xyflow/react';
+import { AppEdge, ClientServerEdgeLabel } from './Edges';
 
 export type ChaosStore = {
     convergenceState: string
@@ -22,6 +24,9 @@ export type ChaosStore = {
     connectedToRemoteServer: boolean
     serversRestarting: Set<string>
 
+    nodes: AppNode[]
+    edges: AppEdge[]
+
     onConnected: (payload: PayloadConfig) => void
     onWorkerAction: (payload: PayloadWorkerAction) => void
     onTickGeneration: (payload: PayloadTickGeneration) => void
@@ -36,6 +41,13 @@ export type ChaosStore = {
     restart: (hsName: string) => void
     netsplitToggle: () => void
     testConvergence: () => void
+
+    onNodesChange: (changes: NodeChange<AppNode>[]) => void
+    onEdgesChange: (changes: EdgeChange<AppEdge>[]) => void
+    onConnect: (connection: Edge | Connection) => void
+    setNodes: (nodes: AppNode[]) => void
+    setEdges: (edges: AppEdge[]) => void
+
 }
 
 
@@ -55,6 +67,24 @@ export const useStore = create<ChaosStore>()((set, get) => ({
     clients: {},
     inflightFedRequests: new Map(),
     serversRestarting: new Set<string>(),
+    nodes: [
+        {
+            id: 'hs1', type: 'homeserver-node', position: { x: -300, y: 100 },
+            data: { domain: "hs1" }
+        },
+        {
+            id: 'hs2', type: 'homeserver-node', position: { x: 300, y: 100 },
+            data: { domain: "hs2" }
+        },
+        { id: "client1", type: "client-node", position: { x: -300, y: -100 }, data: { domain: "hs1" } },
+        { id: "client2", type: "client-node", position: { x: 300, y: -100 }, data: { domain: "hs2" } },
+    ],
+    edges: [
+        { id: 'hs1hs2', source: 'hs1', target: 'hs2', sourceHandle: "federationR", targetHandle: "federationL", label: "hs1", type: "federation", data: { domain: "hs1" } },
+        { id: 'hs2hs1', source: 'hs2', target: 'hs1', sourceHandle: "federationL", targetHandle: "federationR", label: "hs2", type: "federation", data: { domain: "hs2" } },
+        { id: "hs1-client1", source: "client1", target: "hs1", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs1" /> },
+        { id: "hs2-client1", source: "client2", target: "hs2", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs2" /> },
+    ],
 
     // Server-received actions (mapped from WS payloads)
     // -------------------------------------------------
@@ -201,5 +231,30 @@ export const useStore = create<ChaosStore>()((set, get) => ({
     },
     testConvergence: (): void => {
         ws.testConvergence();
-    }
+    },
+
+    // Reactflow functions
+    // -------------------
+
+    onNodesChange: (changes) => {
+        set({
+            nodes: applyNodeChanges(changes, get().nodes),
+        });
+    },
+    onEdgesChange: (changes) => {
+        set({
+            edges: applyEdgeChanges(changes, get().edges),
+        });
+    },
+    onConnect: (connection) => {
+        set({
+            edges: addEdge(connection, get().edges),
+        });
+    },
+    setNodes: (nodes) => {
+        set({ nodes });
+    },
+    setEdges: (edges) => {
+        set({ edges });
+    },
 }));

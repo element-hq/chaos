@@ -9,6 +9,9 @@ export type FederationEdgeData = {
     domain: string
 };
 
+// Define nodes and edges
+export type AppEdge = FederationEdge | Edge;
+
 export function FederationEdge({
     sourceX,
     sourceY,
