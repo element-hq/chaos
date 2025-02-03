@@ -15,12 +15,18 @@ homeservers:
     url: "https://localhost:4051"
     # Docker-network domain name, also the name used in the domain part of user IDs
     domain: hs1
+    restart:
+      type: docker
+      config:
+        timeout_secs: 1
+        signal: SIGTERM  # can SIGKILL to test ungraceful shutdown.
+        container_name: chaos-hs1-1
   - url: "https://localhost:4052"
     domain: hs2
     restart:
       type: docker
       config:
-        timeout_secs: 3
+        timeout_secs: 1
         signal: SIGTERM  # can SIGKILL to test ungraceful shutdown.
         container_name: chaos-hs2-1
 # Test runtime configuration

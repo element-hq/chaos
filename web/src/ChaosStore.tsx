@@ -193,6 +193,7 @@ export const useStore = create<ChaosStore>()((set, get) => ({
     },
     restart: (hsName: string): void => {
         console.log("restart ", hsName);
+        ws.setRestart(hsName);
     },
     netsplitToggle: (): void => {
         console.log("netsplitToggle");

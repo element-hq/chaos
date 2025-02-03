@@ -67,6 +67,11 @@ export class ChaosWebsocket extends EventTarget {
             Netsplit: isNetsplit,
         }));
     }
+    setRestart(domain: string) {
+        this.ws.send(JSON.stringify({
+            RestartServers: [domain],
+        }));
+    }
 }
 
 export type PayloadNetsplit = {
