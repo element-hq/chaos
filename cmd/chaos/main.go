@@ -58,6 +58,18 @@ func main() {
 
 	// blocks forever
 	if *flagWeb {
+		hasServersOtherThanHS12 := false
+		for _, hs := range cfg.Homeservers {
+			if hs.Domain != "hs1" && hs.Domain != "hs2" {
+				hasServersOtherThanHS12 = true
+				break
+			}
+		}
+		if hasServersOtherThanHS12 {
+			log.Println("WARNING:")
+			log.Println("The web UI only current supports 2 servers named 'hs1' and 'hs2'.")
+			log.Println("The config you have provided suggests there are other servers with different names, which will not render correctly. Use without --web.")
+		}
 		go func() {
 			time.Sleep(500 * time.Millisecond)
 			open(fmt.Sprintf("http://localhost:%d", *flagWebPort))
