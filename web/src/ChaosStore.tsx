@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { type AppNode } from "./Nodes";
 import { ChaosWebsocket, PayloadConfig, PayloadConvergence, PayloadFederationRequest, PayloadNetsplit, PayloadRestart, PayloadTickGeneration, PayloadWorkerAction } from './WebSockets';
-import { addEdge, applyEdgeChanges, applyNodeChanges, Connection, Edge, EdgeChange, NodeChange } from '@xyflow/react';
+import { addEdge, applyEdgeChanges, applyNodeChanges, Connection, Edge, EdgeChange, NodeChange, Position } from '@xyflow/react';
 import { AppEdge, ClientServerEdgeLabel } from './Edges';
 
 export type ChaosStore = {
@@ -14,9 +14,8 @@ export type ChaosStore = {
         start: number,
     }>
 
-    // for now this is domain => client so we only support 1 client TODO allow multiple
+    // user_id => action
     clients: Record<string, {
-        userId: string,
         action: string,
     }>
     tickNumber: number
@@ -56,6 +55,7 @@ function sleep(ms: number) {
 }
 
 let ws = new ChaosWebsocket();
+let addedListeners = false;
 
 export const useStore = create<ChaosStore>()((set, get) => ({
     convergenceState: "-",
@@ -91,8 +91,8 @@ export const useStore = create<ChaosStore>()((set, get) => ({
 
     onConnected: (payload: PayloadConfig) => {
         console.log("onConnected ", payload);
-        if (payload.Config.Test.NumUsers !== 2 || payload.Config.Homeservers.length !== 2) {
-            console.error("Incompatible Chaos configuration, only 2 HS with 1 user each is supported currently.");
+        if (payload.Config.Homeservers.length !== 2) {
+            console.error("Incompatible Chaos configuration, only 2 HSes are supported currently.");
             console.error("Configuration received:", payload.Config);
         }
         if (payload.Config.Test.FederationDelayMs) {
@@ -101,47 +101,56 @@ export const useStore = create<ChaosStore>()((set, get) => ({
             });
         }
         const clients: Record<string, {
-            userId: string,
             action: string,
         }> = {};
         const nodes = get().nodes;
         const edges = get().edges;
+        const usersByDomain = new Map<string, string[]>();
         for (const userId of payload.WorkerUserIDs) {
-            const domain = userId.split(":")[1]
-            clients[domain] = {
-                userId: userId,
-                action: "-",
-            };
-            nodes.push({
-                id: "client-" + domain,
-                type: "client-node",
-                position: { x: domain === "hs1" ? -300 : 300, y: -100 },
-                data: { domain: domain },
-            } as AppNode);
-            edges.push({
-                id: domain + "-client1",
-                source: "client-" + domain,
-                target: domain,
-                animated: true,
-                type: "default",
-                label: <ClientServerEdgeLabel domain={domain} />
-            });
+            const domain = userId.split(":")[1];
+            const entries = usersByDomain.get(domain) || [];
+            entries.push(userId);
+            usersByDomain.set(domain, entries);
+        }
+        for (const [domain, userIds] of usersByDomain) {
+            for (let i = 0; i < userIds.length; i++) {
+                const userId = userIds[i];
+                const domain = userId.split(":")[1];
+                clients[userId] = {
+                    action: "-",
+                };
+                nodes.push({
+                    id: userId,
+                    type: "client-node",
+                    position: { x: domain === "hs1" ? -600 : 600, y: -150 + (i * 150) },
+                    data: { userId: userId, position: domain === "hs1" ? Position.Right : Position.Left },
+                } as AppNode);
+                edges.push({
+                    id: userId + "-edge",
+                    source: userId,
+                    target: domain,
+                    animated: true,
+                    type: "default",
+                    label: <ClientServerEdgeLabel userId={userId} />
+                });
+            }
         }
         console.log("setting", clients);
         set({
             clients: clients,
+            // need to copy else reactflow blows up as I guess it does a shallow check
+            // and doesn't update its internal state otherwise.
             nodes: Array.from(nodes),
             edges: Array.from(edges),
         });
     },
     onWorkerAction: (payload: PayloadWorkerAction) => {
-        const domain = payload.UserID.split(":")[1];
-        const client = get().clients[domain];
+        const client = get().clients[payload.UserID];
         client.action = `${payload.Action} ${payload.Body ? payload.Body : ""}`;
         set({
             clients: {
                 ...get().clients,
-                domain: client,
+                [payload.UserID]: client,
             }
         })
     },
@@ -210,30 +219,33 @@ export const useStore = create<ChaosStore>()((set, get) => ({
 
     connect: async (wsAddr: string): Promise<void> => {
         console.log("connect ", wsAddr);
-        ws.addEventListener("PayloadConfig", (ev: unknown) => {
-            set({
-                connectedToRemoteServer: true,
+        if (!addedListeners) {
+            ws.addEventListener("PayloadConfig", (ev: unknown) => {
+                set({
+                    connectedToRemoteServer: true,
+                });
+                get().onConnected((ev as CustomEvent).detail);
             });
-            get().onConnected((ev as CustomEvent).detail);
-        });
-        ws.addEventListener("PayloadWorkerAction", (ev: unknown) => {
-            get().onWorkerAction((ev as CustomEvent).detail);
-        });
-        ws.addEventListener("PayloadTickGeneration", (ev: unknown) => {
-            get().onTickGeneration((ev as CustomEvent).detail);
-        });
-        ws.addEventListener("PayloadConvergence", (ev: unknown) => {
-            get().onConvergenceUpdate((ev as CustomEvent).detail);
-        });
-        ws.addEventListener("PayloadNetsplit", (ev: unknown) => {
-            get().onNetsplit((ev as CustomEvent).detail);
-        });
-        ws.addEventListener("PayloadFederationRequest", (ev: unknown) => {
-            get().onFederationRequest((ev as CustomEvent).detail);
-        });
-        ws.addEventListener("PayloadRestart", (ev: unknown) => {
-            get().onServerRestart((ev as CustomEvent).detail);
-        });
+            ws.addEventListener("PayloadWorkerAction", (ev: unknown) => {
+                get().onWorkerAction((ev as CustomEvent).detail);
+            });
+            ws.addEventListener("PayloadTickGeneration", (ev: unknown) => {
+                get().onTickGeneration((ev as CustomEvent).detail);
+            });
+            ws.addEventListener("PayloadConvergence", (ev: unknown) => {
+                get().onConvergenceUpdate((ev as CustomEvent).detail);
+            });
+            ws.addEventListener("PayloadNetsplit", (ev: unknown) => {
+                get().onNetsplit((ev as CustomEvent).detail);
+            });
+            ws.addEventListener("PayloadFederationRequest", (ev: unknown) => {
+                get().onFederationRequest((ev as CustomEvent).detail);
+            });
+            ws.addEventListener("PayloadRestart", (ev: unknown) => {
+                get().onServerRestart((ev as CustomEvent).detail);
+            });
+            addedListeners = true;
+        }
         await ws.connect(wsAddr);
     },
     start: async (): Promise<void> => {

@@ -52,11 +52,14 @@ export default function App() {
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       fitView
+      fitViewOptions={{
+        padding: 1.5,
+      }}
     >
       <Background />
       <Controls />
       <ChaosPanel />
 
-    </ReactFlow>
+    </ReactFlow >
   );
 }

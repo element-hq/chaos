@@ -104,9 +104,9 @@ export function FederationEdge({
 
 
 
-export function ClientServerEdgeLabel(props: { domain: string }) {
+export function ClientServerEdgeLabel(props: { userId: string }) {
     const clients = useStore((state) => state.clients);
-    let client = clients[props.domain] || { action: "-" };
+    let client = clients[props.userId] || { action: "-" };
     return (
         <>
             {client.action}

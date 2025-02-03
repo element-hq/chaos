@@ -10,20 +10,27 @@ export class ChaosWebsocket extends EventTarget {
     ws!: WebSocket;
 
     connect(url: string): Promise<void> {
-        this.ws = new WebSocket(url);
-        return new Promise<void>((resolve) => {
+        return new Promise<void>((resolve, reject) => {
+            try {
+                this.ws = new WebSocket(url);
+            } catch (err) {
+                reject(err);
+                return;
+            }
             this.ws.addEventListener("open", () => {
                 console.log("WS open");
                 resolve();
             });
-            this.ws.addEventListener("error", this.onWsError.bind(this));
+            this.ws.addEventListener("error", (ev: Event) => {
+                console.error("WS error", ev);
+                reject(ev);
+            });
             this.ws.addEventListener("close", this.onWsClose.bind(this));
             this.ws.addEventListener("message", this.onWsMessage.bind(this));
         });
     }
 
     onWsClose(_: CloseEvent) {}
-    onWsError(_: Event) {}
     onWsMessage(ev: MessageEvent) {
         const msg = JSON.parse(ev.data) as WebSocketMessage;
         switch (msg.Type) {

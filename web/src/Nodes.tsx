@@ -5,27 +5,20 @@ import { useStore } from './ChaosStore';
 export type ClientNode = Node<ClientNodeData, 'client-node'>;
 
 export type ClientNodeData = {
-    domain: string,
+    userId: string,
+    position: Position,
 };
 
 export function ClientNode({
     data,
 }: NodeProps<ClientNode>) {
-    const clients = useStore((state) => state.clients);
-    let client = clients[data.domain];
-    if (!client) {
-        client = {
-            userId: "-",
-            action: "-",
-        };
-    }
 
     return (
         // We add this class to use the same styles as React Flow's default nodes.
         <div className="react-flow__node-default">
             <img src="/client.svg" width="48px" />
-            <div>{client.userId}</div>
-            <Handle type="source" position={Position.Bottom} />
+            <div>{data.userId}</div>
+            <Handle type="source" position={data.position} />
         </div>
     );
 }

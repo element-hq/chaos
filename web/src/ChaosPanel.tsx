@@ -25,12 +25,20 @@ export function ChaosPanel() {
         })),
     );
     let [wsURL, setWsURL] = useState("http://localhost:7405")
+    let [isConnecting, setConnecting] = useState(false);
 
     return <Panel position="top-left">
         <div id="chaos-panel">
             <img src="chaos-alpha.png" id="chaos-img" width="100px" />
             <input type="input" placeholder="Chaos WS URL" value={wsURL} onChange={(e) => setWsURL(e.target.value)} />
-            <input type="button" value="Connect" onClick={() => store.connect(wsURL)} />
+            <input type="button" value="Connect" disabled={isConnecting} onClick={async () => {
+                setConnecting(true);
+                try {
+                    await store.connect(wsURL);
+                } finally {
+                    setConnecting(false);
+                }
+            }} />
             {store.connectedToRemoteServer ? <>
                 <InfoBox buttonName="Start" label={"Tick: " + store.tickNumber} onClick={() => store.start()} />
                 <InfoBox buttonName="Netsplit" label={store.isNetsplit ? "Disconnected" : "Connected"} onClick={() => store.netsplitToggle()} />
