@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { type AppNode } from "./Nodes";
-import { ChaosWebsocket, PayloadConfig, PayloadConvergence, PayloadFederationRequest, PayloadNetsplit, PayloadTickGeneration, PayloadWorkerAction } from './WebSockets';
+import { ChaosWebsocket, PayloadConfig, PayloadConvergence, PayloadFederationRequest, PayloadNetsplit, PayloadRestart, PayloadTickGeneration, PayloadWorkerAction } from './WebSockets';
 
 export type ChaosStore = {
     convergenceState: string
@@ -20,6 +20,7 @@ export type ChaosStore = {
     tickNumber: number
 
     connectedToRemoteServer: boolean
+    serversRestarting: Set<string>
 
     onConnected: (payload: PayloadConfig) => void
     onWorkerAction: (payload: PayloadWorkerAction) => void
@@ -27,6 +28,7 @@ export type ChaosStore = {
     onConvergenceUpdate: (payload: PayloadConvergence) => void
     onNetsplit: (payload: PayloadNetsplit) => void
     onFederationRequest: (payload: PayloadFederationRequest) => void
+    onServerRestart: (payload: PayloadRestart) => void
 
 
     connect: (wsAddr: string) => void
@@ -52,6 +54,7 @@ export const useStore = create<ChaosStore>()((set, get) => ({
     fedLatencyMs: 1000,
     clients: {},
     inflightFedRequests: new Map(),
+    serversRestarting: new Set<string>(),
 
     // Server-received actions (mapped from WS payloads)
     // -------------------------------------------------
@@ -136,6 +139,20 @@ export const useStore = create<ChaosStore>()((set, get) => ({
             };
         });
     },
+    onServerRestart: (payload: PayloadRestart) => {
+        useStore.setState((prev) => {
+            const copy = new Set<string>(prev.serversRestarting);
+            if (payload.Finished) {
+                copy.delete(payload.Domain);
+            } else {
+                copy.add(payload.Domain);
+            }
+            console.log("Servers restarting: ", Array.from(copy));
+            return {
+                serversRestarting: copy,
+            };
+        });
+    },
 
 
 
@@ -164,6 +181,9 @@ export const useStore = create<ChaosStore>()((set, get) => ({
         });
         ws.addEventListener("PayloadFederationRequest", (ev: unknown) => {
             get().onFederationRequest((ev as CustomEvent).detail);
+        });
+        ws.addEventListener("PayloadRestart", (ev: unknown) => {
+            get().onServerRestart((ev as CustomEvent).detail);
         });
         await ws.connect(wsAddr);
     },

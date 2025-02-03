@@ -46,6 +46,9 @@ export class ChaosWebsocket extends EventTarget {
                 msg.Payload.ID = msg.ID;
                 this.dispatchEvent(new CustomEvent("PayloadFederationRequest", {detail: msg.Payload}));
                 break;
+            case "PayloadRestart":
+                this.dispatchEvent(new CustomEvent("PayloadRestart", {detail: msg.Payload}));
+                break;
         }
     }
 
@@ -95,4 +98,8 @@ export type PayloadFederationRequest = {
     URL: string,
     Body: Record<string,any>,
     Blocked: boolean
+}
+export type PayloadRestart = {
+    Domain: string,
+    Finished: boolean,
 }

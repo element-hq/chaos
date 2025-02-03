@@ -29,17 +29,11 @@ export type AppEdge = FederationEdge | Edge;
 const initialNodes: AppNode[] = [
   {
     id: 'hs1', type: 'homeserver-node', position: { x: -300, y: 100 },
-    data: {
-      isRestarting: false,
-      domain: "hs1",
-    }
+    data: { domain: "hs1" }
   },
   {
     id: 'hs2', type: 'homeserver-node', position: { x: 300, y: 100 },
-    data: {
-      isRestarting: false,
-      domain: "hs2",
-    }
+    data: { domain: "hs2" }
   },
   { id: "client1", type: "client-node", position: { x: -300, y: -100 }, data: { domain: "hs1" } },
   { id: "client2", type: "client-node", position: { x: 300, y: -100 }, data: { domain: "hs2" } },

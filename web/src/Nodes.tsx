@@ -34,7 +34,6 @@ export function ClientNode({
 export type HomeserverNode = Node<HomeserverNodeData, 'homeserver-node'>;
 
 export type HomeserverNodeData = {
-    isRestarting: boolean,
     domain: string,
 };
 
@@ -42,6 +41,8 @@ export function HomeserverNode({
     data,
 }: NodeProps<HomeserverNode>) {
     const d = data as HomeserverNodeData;
+    const serversRestarting = useStore((state) => state.serversRestarting);
+    const isServerRestarting = serversRestarting.has(d.domain);
 
     return (
         // We add this class to use the same styles as React Flow's default nodes.
@@ -50,7 +51,7 @@ export function HomeserverNode({
                 {data.domain && <div>{data.domain}</div>}
 
                 <div>
-                    <input type="button" value={d.isRestarting ? "Restarting" : "Restart"} disabled={d.isRestarting} />
+                    <input type="button" value={isServerRestarting ? "Restarting" : "Restart"} disabled={isServerRestarting} />
                 </div>
 
                 <Handle type="target" id="client" position={Position.Top} />
