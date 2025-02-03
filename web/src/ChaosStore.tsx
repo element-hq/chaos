@@ -76,20 +76,21 @@ export const useStore = create<ChaosStore>()((set, get) => ({
             id: 'hs2', type: 'homeserver-node', position: { x: 300, y: 100 },
             data: { domain: "hs2" }
         },
-        { id: "client1", type: "client-node", position: { x: -300, y: -100 }, data: { domain: "hs1" } },
-        { id: "client2", type: "client-node", position: { x: 300, y: -100 }, data: { domain: "hs2" } },
+        //{ id: "client1", type: "client-node", position: { x: -300, y: -100 }, data: { domain: "hs1" } },
+        //{ id: "client2", type: "client-node", position: { x: 300, y: -100 }, data: { domain: "hs2" } },
     ],
     edges: [
         { id: 'hs1hs2', source: 'hs1', target: 'hs2', sourceHandle: "federationR", targetHandle: "federationL", label: "hs1", type: "federation", data: { domain: "hs1" } },
         { id: 'hs2hs1', source: 'hs2', target: 'hs1', sourceHandle: "federationL", targetHandle: "federationR", label: "hs2", type: "federation", data: { domain: "hs2" } },
-        { id: "hs1-client1", source: "client1", target: "hs1", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs1" /> },
-        { id: "hs2-client1", source: "client2", target: "hs2", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs2" /> },
+        //{ id: "hs1-client1", source: "client1", target: "hs1", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs1" /> },
+        //{ id: "hs2-client1", source: "client2", target: "hs2", animated: true, type: "default", label: <ClientServerEdgeLabel domain="hs2" /> },
     ],
 
     // Server-received actions (mapped from WS payloads)
     // -------------------------------------------------
 
     onConnected: (payload: PayloadConfig) => {
+        console.log("onConnected ", payload);
         if (payload.Config.Test.NumUsers !== 2 || payload.Config.Homeservers.length !== 2) {
             console.error("Incompatible Chaos configuration, only 2 HS with 1 user each is supported currently.");
             console.error("Configuration received:", payload.Config);
@@ -103,16 +104,34 @@ export const useStore = create<ChaosStore>()((set, get) => ({
             userId: string,
             action: string,
         }> = {};
+        const nodes = get().nodes;
+        const edges = get().edges;
         for (const userId of payload.WorkerUserIDs) {
             const domain = userId.split(":")[1]
             clients[domain] = {
                 userId: userId,
                 action: "-",
             };
+            nodes.push({
+                id: "client-" + domain,
+                type: "client-node",
+                position: { x: domain === "hs1" ? -300 : 300, y: -100 },
+                data: { domain: domain },
+            } as AppNode);
+            edges.push({
+                id: domain + "-client1",
+                source: "client-" + domain,
+                target: domain,
+                animated: true,
+                type: "default",
+                label: <ClientServerEdgeLabel domain={domain} />
+            });
         }
         console.log("setting", clients);
         set({
             clients: clients,
+            nodes: Array.from(nodes),
+            edges: Array.from(edges),
         });
     },
     onWorkerAction: (payload: PayloadWorkerAction) => {

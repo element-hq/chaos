@@ -82,7 +82,6 @@ export function FederationEdge({
         // does not start. To fix this, we explicitly ask for a animation frame then call beginElement on the animateMotion.
         setTimeout(() => {
             requestAnimationFrame(() => {
-                console.log(diff, animRefs.current);
                 for (const animKey of diff) {
                     animRefs.current[animKey]?.beginElement();
                 }

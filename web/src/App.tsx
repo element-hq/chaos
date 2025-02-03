@@ -34,14 +34,14 @@ const selector = (state: ChaosStore) => ({
   onNodesChange: state.onNodesChange,
   onEdgesChange: state.onEdgesChange,
   onConnect: state.onConnect,
+  clients: state.clients,
 });
 
 // Run  the app
 export default function App() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useStore(
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, clients } = useStore(
     useShallow(selector),
   );
-
   return (
     <ReactFlow
       nodes={nodes}
