@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/element-hq/chaos/internal/ws"
+	"github.com/element-hq/chaos/ws"
 )
 
 type ConvergenceMechanism = int
@@ -158,6 +158,9 @@ func (c *Convergence) assertWithSync(master CSAPIConvergence, roomStates map[str
 // until that has arrived before checking room state.
 func (c *Convergence) ensureSynchronised(ctx context.Context) error {
 	syncMessages := make(map[string][]string) // room ID => event IDs
+
+	// small buffer to ensure we actually are no longer netsplit
+	time.Sleep(time.Second)
 
 	// each master sends a synchronise in each room. Remember the event ID of each.
 	for _, master := range c.masters {

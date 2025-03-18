@@ -11,7 +11,7 @@ import (
 
 	"github.com/element-hq/chaos"
 	"github.com/element-hq/chaos/config"
-	"github.com/element-hq/chaos/internal/ws"
+	"github.com/element-hq/chaos/ws"
 )
 
 func open(url string) error {

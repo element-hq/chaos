@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/element-hq/chaos/config"
-	"github.com/element-hq/chaos/internal/ws"
+	"github.com/element-hq/chaos/ws"
 )
 
 type Master struct {

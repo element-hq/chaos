@@ -16,9 +16,9 @@ import (
 
 	"github.com/element-hq/chaos/config"
 	"github.com/element-hq/chaos/internal"
-	"github.com/element-hq/chaos/internal/ws"
 	"github.com/element-hq/chaos/restart"
 	"github.com/element-hq/chaos/snapshot"
+	"github.com/element-hq/chaos/ws"
 	"github.com/gorilla/websocket"
 )
 

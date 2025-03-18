@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/element-hq/chaos/internal/ws"
+	"github.com/element-hq/chaos/ws"
 	"github.com/stretchr/testify/assert"
 )
 
