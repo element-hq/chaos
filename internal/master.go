@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"sync"
 	"maps"
 	"net/http"
@@ -90,66 +89,47 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	}
 	log.Printf("Created rooms: %v", roomIDs)
 	// create the users, alternating each server
-	users := make([]CSAPI, cfg.Test.NumUsers)
-	userIDs := make([]string, cfg.Test.NumUsers)
+	var users []CSAPI
+	var userIDs []string
 
-	const maxBatchSize int = 25
-	skip := 0
-	batchAmount := int(math.Ceil(float64(cfg.Test.NumUsers / maxBatchSize)))
-
-	for i := 0; i <= batchAmount; i++ {
-		lowerBound := skip
-		upperBound := skip + maxBatchSize
-
-		if upperBound > cfg.Test.NumUsers {
-			upperBound = cfg.Test.NumUsers
-		}
-
-		batchUsers := users[lowerBound:upperBound]
-		batchUserIDs := userIDs[lowerBound:upperBound]
-		skip += maxBatchSize
-
-		var itemProcessingGroup sync.WaitGroup
-		itemProcessingGroup.Add(len(batchUsers))
-
-		processingErrorChan := make(chan error)
-		processingDoneChan := make(chan int)
-		processingErrors := make([]error, 0)
-
-		go func() {
-			for {
-				select {
-				case err := <-processingErrorChan:
-					processingErrors = append(processingErrors, err)
-				case <-processingDoneChan:
-					close(processingErrorChan)
-					close(processingDoneChan)
-					return
-				}
-			}
-		}()
-
-		for idx := range batchUsers {
-			go func(currentUser *CSAPI, currentUserID *string, currentIdx int) {
-				defer itemProcessingGroup.Done()
-
-				server := servers[i%len(servers)]
-				u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), lowerBound+currentIdx), server.URL, cfg.Verbose)
-				if err != nil {
-			  	processingErrorChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
-					return
-				}
-				*currentUser = u
-				*currentUserID = u.UserID
-			}(&batchUsers[idx], &batchUserIDs[idx],idx)
-		}
-
-		itemProcessingGroup.Wait()
-		processingDoneChan <- 0
-		if len(processingErrors) > 0 {
-			return fmt.Errorf("failed to register users on domain: %s", processingErrors[0])
-		}
+	const numGoroutines int = 25
+	ch := make(chan int, cfg.Test.NumUsers)
+	for i := 0; i < cfg.Test.NumUsers; i++ {
+			ch <- i
 	}
+	close(ch)
+	errChan := make(chan error, numGoroutines)
+	resultCh := make(chan *CSAPI, cfg.Test.NumUsers)
+
+
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	for i := 0; i <= numGoroutines; i++ {
+			go func() {
+				defer wg.Done()
+        for work := range ch {
+					server := servers[i%len(servers)]
+					u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), i*numGoroutines+work), server.URL, cfg.Verbose)
+					if err != nil {
+						errChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
+						return
+					}
+					resultCh <- &u
+				}
+			}()
+	}
+	wg.Wait()
+
+	for err := range errChan {
+    return fmt.Errorf("failed to create users: %s", err)
+}
+
+	for user := range resultCh {
+			users = append(users, *user)
+			userIDs = append(userIDs, user.UserID)
+	}
+
 	log.Printf("Created users: %v", userIDs)
 	m.roomIDs = roomIDs
 	m.users = users
