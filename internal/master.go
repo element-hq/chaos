@@ -61,52 +61,81 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	}
 	log.Printf("Created masters: %v", masterIDs)
 	// create the required rooms. Cycle who creates them to ensure we don't make them all on one server.
-	var roomIDs []string
+
+	ch := make(chan int, cfg.Test.NumRooms)
 	for i := 0; i < cfg.Test.NumRooms; i++ {
-		creatorIndex := i % len(masters)
-		creator := masters[creatorIndex]
-		createOpts := map[string]interface{}{
-			"preset": "public_chat",
-		}
-		if cfg.Test.RoomVersion != "" {
-			createOpts["room_version"] = cfg.Test.RoomVersion
-		}
-		roomID, err := creator.CreateRoom(createOpts)
-		if err != nil {
-			return fmt.Errorf("%s failed to create room: %s", creator.UserID, err)
-		}
-		// everyone else joins the room
-		for i := range masters {
-			if i == creatorIndex {
-				continue
-			}
-			if err := masters[i].JoinRoom(roomID, []string{creator.Domain}); err != nil {
-				return fmt.Errorf("%s failed to join room %s : %s", masters[i].UserID, roomID, err)
-			}
-			masters[i].EnsureFullyJoined(roomID)
-		}
-		roomIDs = append(roomIDs, roomID)
+			ch <- i
+	}
+	close(ch)
+	errChan := make(chan error, cfg.Test.NumInitGoroutines)
+	resultRoomsCh := make(chan string, cfg.Test.NumRooms)
+
+	var roomIDs []string
+
+	var wgRooms sync.WaitGroup
+	wgRooms.Add(cfg.Test.NumInitGoroutines)
+
+	for i := 0; i < cfg.Test.NumInitGoroutines; i++ {
+			go func() {
+				defer wgRooms.Done()
+        for range ch {
+					creatorIndex := i % len(masters)
+					creator := masters[creatorIndex]
+					createOpts := map[string]interface{}{
+						"preset": "public_chat",
+					}
+					if cfg.Test.RoomVersion != "" {
+						createOpts["room_version"] = cfg.Test.RoomVersion
+					}
+					roomID, err := creator.CreateRoom(createOpts)
+					if err != nil {
+						errChan <- fmt.Errorf("%s failed to create room: %s", creator.UserID, err)
+						return
+					}
+					// everyone else joins the room
+					for i := range masters {
+						if i == creatorIndex {
+							continue
+						}
+						if err := masters[i].JoinRoom(roomID, []string{creator.Domain}); err != nil {
+							errChan <- fmt.Errorf("%s failed to join room %s : %s", masters[i].UserID, roomID, err)
+							return
+						}
+						masters[i].EnsureFullyJoined(roomID)
+					}
+					resultRoomsCh <- roomID
+				}
+			}()
+	}
+	wgRooms.Wait()
+
+	for err := range errChan {
+    return fmt.Errorf("failed to create rooms: %s", err)
+}
+
+	for roomID := range resultRoomsCh {
+			roomIDs = append(roomIDs, roomID)
 	}
 	log.Printf("Created rooms: %v", roomIDs)
 	// create the users, alternating each server
 	var users []CSAPI
 	var userIDs []string
 
-	ch := make(chan int, cfg.Test.NumUsers)
+	ch = make(chan int, cfg.Test.NumUsers)
 	for i := 0; i < cfg.Test.NumUsers; i++ {
 			ch <- i
 	}
 	close(ch)
-	errChan := make(chan error, cfg.Test.NumInitGoroutines)
-	resultCh := make(chan *CSAPI, cfg.Test.NumUsers)
+	errChan = make(chan error, cfg.Test.NumInitGoroutines)
+	resultUsersCh := make(chan *CSAPI, cfg.Test.NumUsers)
 
 
-	var wg sync.WaitGroup
-	wg.Add(cfg.Test.NumInitGoroutines)
+	var wgUsers sync.WaitGroup
+	wgUsers.Add(cfg.Test.NumInitGoroutines)
 
-	for i := 0; i <= cfg.Test.NumInitGoroutines; i++ {
+	for i := 0; i < cfg.Test.NumInitGoroutines; i++ {
 			go func() {
-				defer wg.Done()
+				defer wgUsers.Done()
         for work := range ch {
 					server := servers[i%len(servers)]
 					u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), work), server.URL, cfg.Verbose)
@@ -114,17 +143,17 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 						errChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
 						return
 					}
-					resultCh <- &u
+					resultUsersCh <- &u
 				}
 			}()
 	}
-	wg.Wait()
+	wgUsers.Wait()
 
 	for err := range errChan {
     return fmt.Errorf("failed to create users: %s", err)
 }
 
-	for user := range resultCh {
+	for user := range resultUsersCh {
 			users = append(users, *user)
 			userIDs = append(userIDs, user.UserID)
 	}
