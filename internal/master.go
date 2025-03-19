@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
+	"sync"
 	"maps"
 	"net/http"
 	"slices"
@@ -88,16 +90,65 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	}
 	log.Printf("Created rooms: %v", roomIDs)
 	// create the users, alternating each server
-	var users []CSAPI
-	var userIDs []string
-	for i := 0; i < cfg.Test.NumUsers; i++ {
-		server := servers[i%len(servers)]
-		user, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), i), server.URL, cfg.Verbose)
-		if err != nil {
-			return fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
+	users := make([]CSAPI, cfg.Test.NumUsers)
+	userIDs := make([]string, cfg.Test.NumUsers)
+
+	const maxBatchSize int = 25
+	skip := 0
+	batchAmount := int(math.Ceil(float64(cfg.Test.NumUsers / maxBatchSize)))
+
+	for i := 0; i <= batchAmount; i++ {
+		lowerBound := skip
+		upperBound := skip + maxBatchSize
+
+		if upperBound > cfg.Test.NumUsers {
+			upperBound = cfg.Test.NumUsers
 		}
-		users = append(users, user)
-		userIDs = append(userIDs, user.UserID)
+
+		batchUsers := users[lowerBound:upperBound]
+		batchUserIDs := userIDs[lowerBound:upperBound]
+		skip += maxBatchSize
+
+		var itemProcessingGroup sync.WaitGroup
+		itemProcessingGroup.Add(len(batchUsers))
+
+		processingErrorChan := make(chan error)
+		processingDoneChan := make(chan int)
+		processingErrors := make([]error, 0)
+
+		go func() {
+			for {
+				select {
+				case err := <-processingErrorChan:
+					processingErrors = append(processingErrors, err)
+				case <-processingDoneChan:
+					close(processingErrorChan)
+					close(processingDoneChan)
+					return
+				}
+			}
+		}()
+
+		for idx := range batchUsers {
+			go func(currentUser *CSAPI, currentUserID *string, currentIdx int) {
+				defer itemProcessingGroup.Done()
+
+				server := servers[i%len(servers)]
+				u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), lowerBound+currentIdx), server.URL, cfg.Verbose)
+				if err != nil {
+			  	processingErrorChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
+					return
+				}
+				*currentUser = u
+				*currentUserID = u.UserID
+			}(&batchUsers[idx], &batchUserIDs[idx],idx)
+		}
+
+		itemProcessingGroup.Wait()
+		processingDoneChan <- 0
+		if len(processingErrors) > 0 {
+			return fmt.Errorf("failed to register users on domain: %s", processingErrors[0])
+		}
 	}
 	log.Printf("Created users: %v", userIDs)
 	m.roomIDs = roomIDs
