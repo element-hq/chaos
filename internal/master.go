@@ -92,25 +92,24 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	var users []CSAPI
 	var userIDs []string
 
-	const numGoroutines int = 25
 	ch := make(chan int, cfg.Test.NumUsers)
 	for i := 0; i < cfg.Test.NumUsers; i++ {
 			ch <- i
 	}
 	close(ch)
-	errChan := make(chan error, numGoroutines)
+	errChan := make(chan error, cfg.Test.NumInitGoroutines)
 	resultCh := make(chan *CSAPI, cfg.Test.NumUsers)
 
 
 	var wg sync.WaitGroup
-	wg.Add(numGoroutines)
+	wg.Add(cfg.Test.NumInitGoroutines)
 
-	for i := 0; i <= numGoroutines; i++ {
+	for i := 0; i <= cfg.Test.NumInitGoroutines; i++ {
 			go func() {
 				defer wg.Done()
         for work := range ch {
 					server := servers[i%len(servers)]
-					u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), i*numGoroutines+work), server.URL, cfg.Verbose)
+					u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), work), server.URL, cfg.Verbose)
 					if err != nil {
 						errChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
 						return
