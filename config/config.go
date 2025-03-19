@@ -20,6 +20,7 @@ type Chaos struct {
 
 type TestConfig struct {
 	Seed                   int64  `yaml:"seed"`
+	NumInitGoroutines         int    `yaml:"num_init_goroutines"`
 	NumUsers               int    `yaml:"num_users"`
 	NumRooms               int    `yaml:"num_rooms"`
 	OpsPerTick             int    `yaml:"ops_per_tick"`
