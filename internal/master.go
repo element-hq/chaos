@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"maps"
 	"net/http"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/element-hq/chaos/config"
@@ -64,7 +64,7 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 
 	ch := make(chan int, cfg.Test.NumRooms)
 	for i := 0; i < cfg.Test.NumRooms; i++ {
-			ch <- i
+		ch <- i
 	}
 	close(ch)
 	errChan := make(chan error, cfg.Test.NumInitGoroutines)
@@ -76,86 +76,85 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	wgRooms.Add(cfg.Test.NumInitGoroutines)
 
 	for i := 0; i < cfg.Test.NumInitGoroutines; i++ {
-			go func() {
-				defer wgRooms.Done()
-        for range ch {
-					creatorIndex := i % len(masters)
-					creator := masters[creatorIndex]
-					createOpts := map[string]interface{}{
-						"preset": "public_chat",
+		go func() {
+			defer wgRooms.Done()
+			for work := range ch {
+				creatorIndex := work % len(masters)
+				creator := masters[creatorIndex]
+				createOpts := map[string]interface{}{
+					"preset": "public_chat",
+				}
+				if cfg.Test.RoomVersion != "" {
+					createOpts["room_version"] = cfg.Test.RoomVersion
+				}
+				roomID, err := creator.CreateRoom(createOpts)
+				if err != nil {
+					errChan <- fmt.Errorf("%s failed to create room: %s", creator.UserID, err)
+					return
+				}
+				// everyone else joins the room
+				for i := range masters {
+					if i == creatorIndex {
+						continue
 					}
-					if cfg.Test.RoomVersion != "" {
-						createOpts["room_version"] = cfg.Test.RoomVersion
-					}
-					roomID, err := creator.CreateRoom(createOpts)
-					if err != nil {
-						errChan <- fmt.Errorf("%s failed to create room: %s", creator.UserID, err)
+					if err := masters[i].JoinRoom(roomID, []string{creator.Domain}); err != nil {
+						errChan <- fmt.Errorf("%s failed to join room %s : %s", masters[i].UserID, roomID, err)
 						return
 					}
-					// everyone else joins the room
-					for i := range masters {
-						if i == creatorIndex {
-							continue
-						}
-						if err := masters[i].JoinRoom(roomID, []string{creator.Domain}); err != nil {
-							errChan <- fmt.Errorf("%s failed to join room %s : %s", masters[i].UserID, roomID, err)
-							return
-						}
-						masters[i].EnsureFullyJoined(roomID)
-					}
-					resultRoomsCh <- roomID
+					masters[i].EnsureFullyJoined(roomID)
 				}
-			}()
+				resultRoomsCh <- roomID
+			}
+		}()
 	}
 	wgRooms.Wait()
 
 	for err := range errChan {
-    return fmt.Errorf("failed to create rooms: %s", err)
-}
+		return fmt.Errorf("failed to create rooms: %s", err)
+	}
 
 	for roomID := range resultRoomsCh {
-			roomIDs = append(roomIDs, roomID)
+		roomIDs = append(roomIDs, roomID)
 	}
-	log.Printf("Created rooms: %v", roomIDs)
+
 	// create the users, alternating each server
 	var users []CSAPI
 	var userIDs []string
 
 	ch = make(chan int, cfg.Test.NumUsers)
 	for i := 0; i < cfg.Test.NumUsers; i++ {
-			ch <- i
+		ch <- i
 	}
 	close(ch)
 	errChan = make(chan error, cfg.Test.NumInitGoroutines)
 	resultUsersCh := make(chan *CSAPI, cfg.Test.NumUsers)
 
-
 	var wgUsers sync.WaitGroup
 	wgUsers.Add(cfg.Test.NumInitGoroutines)
 
 	for i := 0; i < cfg.Test.NumInitGoroutines; i++ {
-			go func() {
-				defer wgUsers.Done()
-        for work := range ch {
-					server := servers[i%len(servers)]
-					u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), work), server.URL, cfg.Verbose)
-					if err != nil {
-						errChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
-						return
-					}
-					resultUsersCh <- &u
+		go func() {
+			defer wgUsers.Done()
+			for work := range ch {
+				server := servers[i%len(servers)]
+				u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), work), server.URL, cfg.Verbose)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
+					return
 				}
-			}()
+				resultUsersCh <- &u
+			}
+		}()
 	}
 	wgUsers.Wait()
 
 	for err := range errChan {
-    return fmt.Errorf("failed to create users: %s", err)
-}
+		return fmt.Errorf("failed to create users: %s", err)
+	}
 
 	for user := range resultUsersCh {
-			users = append(users, *user)
-			userIDs = append(userIDs, user.UserID)
+		users = append(users, *user)
+		userIDs = append(userIDs, user.UserID)
 	}
 
 	log.Printf("Created users: %v", userIDs)
