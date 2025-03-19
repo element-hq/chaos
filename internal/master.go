@@ -68,7 +68,7 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	}
 	close(ch)
 	errChan := make(chan error, cfg.Test.NumInitGoroutines)
-	resultRoomsCh := make(chan string, cfg.Test.NumRooms)
+	resultRoomsCh := make(chan *string, cfg.Test.NumRooms)
 
 	var roomIDs []string
 
@@ -93,17 +93,17 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 					return
 				}
 				// everyone else joins the room
-				for i := range masters {
-					if i == creatorIndex {
+				for m := range masters {
+					if m == creatorIndex {
 						continue
 					}
-					if err := masters[i].JoinRoom(roomID, []string{creator.Domain}); err != nil {
-						errChan <- fmt.Errorf("%s failed to join room %s : %s", masters[i].UserID, roomID, err)
+					if err := masters[m].JoinRoom(roomID, []string{creator.Domain}); err != nil {
+						errChan <- fmt.Errorf("%s failed to join room %s : %s", masters[m].UserID, roomID, err)
 						return
 					}
-					masters[i].EnsureFullyJoined(roomID)
+					masters[m].EnsureFullyJoined(roomID)
 				}
-				resultRoomsCh <- roomID
+				resultRoomsCh <- &roomID
 			}
 		}()
 	}
@@ -114,8 +114,9 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	}
 
 	for roomID := range resultRoomsCh {
-		roomIDs = append(roomIDs, roomID)
+		roomIDs = append(roomIDs, *roomID)
 	}
+	log.Printf("Created rooms: %v", roomIDs)
 
 	// create the users, alternating each server
 	var users []CSAPI
