@@ -108,6 +108,8 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 		}()
 	}
 	wgRooms.Wait()
+	close(errChan)
+	close(resultRoomsCh)
 
 	for err := range errChan {
 		return fmt.Errorf("failed to create rooms: %s", err)
@@ -148,6 +150,8 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 		}()
 	}
 	wgUsers.Wait()
+	close(errChan)
+	close(resultUsersCh)
 
 	for err := range errChan {
 		return fmt.Errorf("failed to create users: %s", err)
