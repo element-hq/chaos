@@ -139,7 +139,7 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 		go func() {
 			defer wgUsers.Done()
 			for work := range ch {
-				server := servers[i%len(servers)]
+				server := servers[work%len(servers)]
 				u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), work), server.URL, cfg.Verbose)
 				if err != nil {
 					errChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
