@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/element-hq/chaos/config"
@@ -60,45 +61,107 @@ func (m *Master) Prepare(cfg *config.Chaos) error {
 	}
 	log.Printf("Created masters: %v", masterIDs)
 	// create the required rooms. Cycle who creates them to ensure we don't make them all on one server.
-	var roomIDs []string
+
+	ch := make(chan int, cfg.Test.NumRooms)
 	for i := 0; i < cfg.Test.NumRooms; i++ {
-		creatorIndex := i % len(masters)
-		creator := masters[creatorIndex]
-		createOpts := map[string]interface{}{
-			"preset": "public_chat",
-		}
-		if cfg.Test.RoomVersion != "" {
-			createOpts["room_version"] = cfg.Test.RoomVersion
-		}
-		roomID, err := creator.CreateRoom(createOpts)
-		if err != nil {
-			return fmt.Errorf("%s failed to create room: %s", creator.UserID, err)
-		}
-		// everyone else joins the room
-		for i := range masters {
-			if i == creatorIndex {
-				continue
+		ch <- i
+	}
+	close(ch)
+	errChan := make(chan error, cfg.Test.NumInitGoroutines)
+	resultRoomsCh := make(chan *string, cfg.Test.NumRooms)
+
+	var roomIDs []string
+
+	var wgRooms sync.WaitGroup
+	wgRooms.Add(cfg.Test.NumInitGoroutines)
+
+	for i := 0; i < cfg.Test.NumInitGoroutines; i++ {
+		go func() {
+			defer wgRooms.Done()
+			for work := range ch {
+				creatorIndex := work % len(masters)
+				creator := masters[creatorIndex]
+				createOpts := map[string]interface{}{
+					"preset": "public_chat",
+				}
+				if cfg.Test.RoomVersion != "" {
+					createOpts["room_version"] = cfg.Test.RoomVersion
+				}
+				roomID, err := creator.CreateRoom(createOpts)
+				if err != nil {
+					errChan <- fmt.Errorf("%s failed to create room: %s", creator.UserID, err)
+					return
+				}
+				// everyone else joins the room
+				for m := range masters {
+					if m == creatorIndex {
+						continue
+					}
+					if err := masters[m].JoinRoom(roomID, []string{creator.Domain}); err != nil {
+						errChan <- fmt.Errorf("%s failed to join room %s : %s", masters[m].UserID, roomID, err)
+						return
+					}
+					masters[m].EnsureFullyJoined(roomID)
+				}
+				resultRoomsCh <- &roomID
 			}
-			if err := masters[i].JoinRoom(roomID, []string{creator.Domain}); err != nil {
-				return fmt.Errorf("%s failed to join room %s : %s", masters[i].UserID, roomID, err)
-			}
-			masters[i].EnsureFullyJoined(roomID)
-		}
-		roomIDs = append(roomIDs, roomID)
+		}()
+	}
+	wgRooms.Wait()
+	close(errChan)
+	close(resultRoomsCh)
+
+	for err := range errChan {
+		return fmt.Errorf("failed to create rooms: %s", err)
+	}
+
+	for roomID := range resultRoomsCh {
+		roomIDs = append(roomIDs, *roomID)
 	}
 	log.Printf("Created rooms: %v", roomIDs)
+
 	// create the users, alternating each server
 	var users []CSAPI
 	var userIDs []string
+
+	ch = make(chan int, cfg.Test.NumUsers)
 	for i := 0; i < cfg.Test.NumUsers; i++ {
-		server := servers[i%len(servers)]
-		user, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), i), server.URL, cfg.Verbose)
-		if err != nil {
-			return fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
-		}
-		users = append(users, user)
+		ch <- i
+	}
+	close(ch)
+	errChan = make(chan error, cfg.Test.NumInitGoroutines)
+	resultUsersCh := make(chan *CSAPI, cfg.Test.NumUsers)
+
+	var wgUsers sync.WaitGroup
+	wgUsers.Add(cfg.Test.NumInitGoroutines)
+
+	for i := 0; i < cfg.Test.NumInitGoroutines; i++ {
+		go func() {
+			defer wgUsers.Done()
+			for work := range ch {
+				server := servers[work%len(servers)]
+				u, err := m.registerUser(server.Domain, fmt.Sprintf("user-%d-%d", now.UnixMilli(), work), server.URL, cfg.Verbose)
+				if err != nil {
+					errChan <- fmt.Errorf("failed to register user on domain %s: %s", server.Domain, err)
+					return
+				}
+				resultUsersCh <- &u
+			}
+		}()
+	}
+	wgUsers.Wait()
+	close(errChan)
+	close(resultUsersCh)
+
+	for err := range errChan {
+		return fmt.Errorf("failed to create users: %s", err)
+	}
+
+	for user := range resultUsersCh {
+		users = append(users, *user)
 		userIDs = append(userIDs, user.UserID)
 	}
+
 	log.Printf("Created users: %v", userIDs)
 	m.roomIDs = roomIDs
 	m.users = users
