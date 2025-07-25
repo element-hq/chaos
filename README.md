@@ -10,6 +10,8 @@
 
 Chaos is a partition/fault tolerance testing tool for homeservers. It can cause netsplits and restart servers, and periodically checks for convergence by ensuring all homeservers see the same member list as every other server.
 
+![Web Screenshot](screenshot.png)
+
 ### Quick Start
 ```
 # Node 20+ required
