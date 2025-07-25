@@ -68,5 +68,12 @@ test:
     interval_secs: 10
     # After synchronising, how long to wait to flush through any remaining traffic.
     buffer_secs: 3
+    # whether to stop the tests if convergence fails.
+    halt_on_failure: true
+    # How long to wait for the servers to be synchronised (all servers see the latest event in the room).
+    # The higher the interval_secs, the higher the synchronisation_timeout_secs should be because
+    # Chaos does not otherwise synchronise between servers, meaning there could be 1000s of events that
+    # need to be synchronised prior to performing convergence checks.
+    synchronisation_timeout_secs: 180
   # Where to write metrics to.
   snapshot_db: load.sqlite3

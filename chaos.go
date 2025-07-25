@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -165,7 +166,12 @@ func Bootstrap(cfg *config.Chaos, wsServer *ws.Server) error {
 							wsServer.Send(&ws.PayloadConvergence{
 								State: "starting",
 							})
-							if err := m.CheckConverged(time.Duration(cfg.Test.Convergence.BufferDurationSecs) * time.Second); err != nil {
+							err := m.CheckConverged(
+								time.Duration(cfg.Test.Convergence.SyncTimeoutDurationSecs)*time.Second,
+								time.Duration(cfg.Test.Convergence.BufferDurationSecs)*time.Second,
+							)
+
+							if err != nil {
 								wsServer.Send(&ws.PayloadConvergence{
 									State: "failure",
 									Error: err.Error(),
@@ -258,6 +264,17 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 	log.Printf("Dialling %s\n", addr)
 	var c *websocket.Conn
 	var err error
+	// we track if the server is performing convergence checks.
+	// The server cannot process netsplits/restarts during conv checks, it just drops them, so we won't send
+	// any of those requests when we know conv checks are happening. Instead, we will wait until it is complete
+	// before sending them. If conv checks take > max(restarts.interval_secs, netsplits.free_secs) then we will
+	// immediately restart and netsplit when the conv check finishes, as both restart/netsplit goroutines will
+	// be waiting for it to finish.
+	var convergenceLock sync.Mutex
+	ensureNoConvergence := func() {
+		convergenceLock.Lock() // this will block if the server is doing convergence checks as it'll be already locked
+		defer convergenceLock.Unlock()
+	}
 
 	now := time.Now()
 	for c == nil {
@@ -288,6 +305,7 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 		go func() {
 			for {
 				time.Sleep(time.Duration(testConfig.Netsplits.FreeSecs) * time.Second)
+				ensureNoConvergence()
 				reqCh <- ws.RequestPayload{
 					Netsplit: &yes,
 				}
@@ -304,6 +322,7 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 			for {
 				nextHS := testConfig.Restarts.RoundRobin[i%len(testConfig.Restarts.RoundRobin)]
 				time.Sleep(time.Duration(testConfig.Restarts.IntervalSecs) * time.Second)
+				ensureNoConvergence()
 				reqCh <- ws.RequestPayload{
 					RestartServers: []string{nextHS},
 				}
@@ -342,6 +361,20 @@ func Orchestrate(wsPort int, verbose bool, testConfig config.TestConfig) {
 		if payload.Type() == configPayload.Type() {
 			reqCh <- ws.RequestPayload{
 				Begin: true,
+			}
+		}
+		conv, ok := payload.(*ws.PayloadConvergence)
+		if ok {
+			if testConfig.Convergence.HaltOnFailure && conv.Error != "" {
+				panic("convergence.halt_on_failure set, terminating test: " + conv.Error)
+			}
+			// roughly track if the server is doing convergence. We need to know this because
+			// the server will drop netsplit/restart commands during the convergence checks, so
+			// we don't want to request them during this time.
+			if conv.State == "starting" {
+				convergenceLock.Lock()
+			} else if conv.State == "success" || conv.State == "failure" {
+				convergenceLock.Unlock()
 			}
 		}
 	}

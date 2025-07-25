@@ -36,7 +36,7 @@ test:
   # Number of init goroutine creating rooms & users
   num_init_goroutines: 1
   # Number of users to create. This is round-robined on the number of servers.
-  num_users: 2
+  num_users: 8
   # Number of rooms to create. The creator is round-robined on the number of servers.
   num_rooms: 1
   federation_delay_ms: 400
@@ -45,19 +45,19 @@ test:
   # number between 0-100 which is the % chance the user leaves the room instead of sending a message
   # higher numbers cause more membership transitions overall which stresses the server in different ways.
   # if 100, never sends messages.
-  send_to_leave_probability: 10
+  send_to_leave_probability: 80
   # How many join/sends/leaves to do per tick.
   ops_per_tick: 50
   netsplits:
     # How long netsplits last. If 0, no netsplits.
-    duration_secs: 4
+    duration_secs: 6
     # How long after a netsplit before netsplitting again.
-    free_secs: 10
+    free_secs: 12
   restarts:
     # How often to restart servers
-    interval_secs: 0
+    interval_secs: 41
     # which servers to restart
-    round_robin: ["hs2"]
+    round_robin: ["hs1", "hs2"]
   convergence:
     # Enable convergence checks.
     enabled: true
@@ -65,5 +65,12 @@ test:
     interval_secs: 20
     # After synchronising, how long to wait to flush through any remaining traffic.
     buffer_secs: 3
+    # whether to stop the tests if convergence fails.
+    halt_on_failure: true
+    # How long to wait for the servers to be synchronised (all servers see the latest event in the room).
+    # The higher the interval_secs, the higher the synchronisation_timeout_secs should be because
+    # Chaos does not otherwise synchronise between servers, meaning there could be 1000s of events that
+    # need to be synchronised prior to performing convergence checks.
+    synchronisation_timeout_secs: 180
   # Where to write metrics to.
   snapshot_db: load2.sqlite3

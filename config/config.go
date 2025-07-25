@@ -20,7 +20,7 @@ type Chaos struct {
 
 type TestConfig struct {
 	Seed                   int64  `yaml:"seed"`
-	NumInitGoroutines         int    `yaml:"num_init_goroutines"`
+	NumInitGoroutines      int    `yaml:"num_init_goroutines"`
 	NumUsers               int    `yaml:"num_users"`
 	NumRooms               int    `yaml:"num_rooms"`
 	OpsPerTick             int    `yaml:"ops_per_tick"`
@@ -36,9 +36,11 @@ type TestConfig struct {
 		RoundRobin   []string `yaml:"round_robin"`
 	} `yaml:"restarts"`
 	Convergence struct {
-		Enabled            bool `yaml:"enabled"`
-		IntervalSecs       int  `yaml:"interval_secs"`
-		BufferDurationSecs int  `yaml:"buffer_secs"`
+		Enabled                 bool `yaml:"enabled"`
+		IntervalSecs            int  `yaml:"interval_secs"`
+		BufferDurationSecs      int  `yaml:"buffer_secs"`
+		SyncTimeoutDurationSecs int  `yaml:"synchronisation_timeout_secs"`
+		HaltOnFailure           bool `yaml:"halt_on_failure"`
 	}
 	SnapshotDB string `yaml:"snapshot_db"` // path to sqlite3 file to write snapshot data to
 }

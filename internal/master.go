@@ -262,8 +262,8 @@ func (m *Master) Start(postTickFn func(tickIteration int)) {
 	}
 }
 
-func (m *Master) CheckConverged(bufferDuration time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func (m *Master) CheckConverged(syncTimeoutDuration, bufferDuration time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeoutDuration)
 	defer cancel()
 	return m.convergence.Assert(ctx, bufferDuration)
 }
