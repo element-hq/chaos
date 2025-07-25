@@ -7,6 +7,11 @@ import (
 	"github.com/element-hq/chaos/config"
 )
 
+var (
+	colorRed  = "\033[0;31m"
+	colorNone = "\033[0m"
+)
+
 type Payload struct {
 	payload     WSPayload
 	destination int // the conn ID or if 0 multicast
@@ -133,7 +138,10 @@ type PayloadConvergence struct {
 }
 
 func (w *PayloadConvergence) String() string {
-	return fmt.Sprintf("Convergence[%s]: err=%v", w.State, w.Error)
+	if w.Error == "" {
+		return fmt.Sprintf("Convergence[%s]", w.State)
+	}
+	return fmt.Sprintf("%sConvergence[%s]: err=%v %s", colorRed, w.State, w.Error, colorNone)
 }
 
 func (w *PayloadConvergence) Type() string {
